@@ -30,8 +30,17 @@ const view: View = player.view
 const tracking: Promise<FaceTracking> = startFaceTracking(player)
 const sync: Promise<LipSync> = startLipSync(player)
 const body: Body = new PngBody()
+const bodyPlayer = new BodyPlayer(canvas, body)
 player.use(driver)
-void [VERSION, model, view, tracking, sync, preloadFaceModel(), createSpeech(player), BODY_LIMIT, new BodyPlayer(canvas, body), new VrmBody()]
+void [VERSION, model, view, tracking, sync, preloadFaceModel(), createSpeech(player), BODY_LIMIT, bodyPlayer, new VrmBody()]
+// the expressions getter keeps the model's label fields on both players (issue #8): label is a string, labels a map
+const playerLabels: string[] = player.expressions.map((e) => e.label)
+const playerTranslations: string[] = player.expressions.map((e) => e.labels.en)
+const bodyLabels: string[] = bodyPlayer.expressions.map((e) => e.label)
+const bodyTranslations: string[] = bodyPlayer.expressions.map((e) => e.labels.en)
+void [playerLabels, playerTranslations, bodyLabels, bodyTranslations]
+// @ts-expect-error unknown expression fields stay rejected, not widened to any
+void player.expressions.map((e) => e.nope)
 const options: LoadOptions = { signal: new AbortController().signal, poster: '/cover.webp', onProgress: (p: LoadProgress) => void (p.step === 'download' ? p.progress : 0) }
 const again: Promise<ModelInfo> = player.load('/avatars/sena.livliv', options)
 const point: [number, number] = player.canvasToModel(1, 2)

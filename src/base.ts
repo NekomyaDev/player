@@ -216,7 +216,9 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
 
   /** the loaded character (null before the first load) */
   get model(): Info | null { return this.info }
-  get expressions() { return this.info?.expressions ?? [] as Info['expressions'] }
+  // the return type is the model's own expressions: without it the declaration emitter resolves Info['expressions']
+  // to the constraint ({ id: string }[]) and consumers lose `label` / `labels`
+  get expressions(): Info['expressions'] { return this.info?.expressions ?? [] as Info['expressions'] }
   get playing() { return this.raf !== 0 }
 
   /** runs a load: the one running is called off, and this one's steps are told how to be. A load called off rejects like
