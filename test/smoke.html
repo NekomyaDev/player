@@ -600,8 +600,8 @@
     const pose = p.getPose()
     out.pose = { crouch: pose.crouch, dip: pose.dip, talk: pose.talk, y: pose.move.y, x: pose.move.x, fit: pose.view.fit }
     out.crouchFeet = lowest()
-    // replayed, the same frame; without its crouch and dip, another; sunk whole as a half-body character moves, the
-    // feet go down
+    // replayed, the same frame; without its crouch and dip, another; a pose that would sink it whole (as a half-body
+    // character moves) keeps its feet on the ground, a hop's lift raises them
     const live = pixels()
     p.renderPose(pose)
     out.replayed = changed(live, pixels())
@@ -609,11 +609,21 @@
     out.without = changed(live, pixels())
     p.renderPose({ ...pose, move: { ...pose.move, y: pose.move.y + (pose.crouch ?? 0) }, crouch: 0, dip: 0 })
     out.sunkFeet = lowest()
+    p.renderPose({ ...pose, move: { ...pose.move, y: 0.05 }, crouch: 0, dip: 0 })
+    out.liftFeet = lowest()
     // a lean away is not followed (the figure would float), and a hop lands on its feet
     lean = 0.05; talk = 0; side = 0
     p.play(); p.pause(); p.resize()
     out.leanAway = { y: p.getPose().move.y, crouch: p.getPose().crouch }
     lean = 0
+    // a driver that writes something that is no number, once: the springs carry on, the figure stays
+    side = NaN; p.play(); p.pause(); p.resize(); side = 0
+    for (let i = 0; i < 3; i++) p.resize()
+    out.afterNaN = { x: p.getPose().move.x, hem: Number.isFinite(p.puppet.fbm.hem), share: covered() }
+    // a recorded pose asking for more than live motion could: held to it
+    p.renderPose({ ...pose, move: { ...pose.move, y: -0.3 }, crouch: -1, dip: -1 })
+    const held = p.getPose()
+    out.held = { y: held.move.y, crouch: held.crouch, dip: held.dip }
     out.anchors = { head: !!p.getAnchor('head'), body: !!p.getAnchor('body') }
     p.dispose()
     return out

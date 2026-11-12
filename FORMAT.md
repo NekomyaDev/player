@@ -155,7 +155,7 @@ anchors, lists `full_body` in `requires`, and usually pins its mesh lattice (`ri
 
 | field | |
 |---|---|
-| `frame` | `[x0, y0, x1, y1]`: the head-and-chest window a player shows by default, as a half-body character fills its canvas. It may reach past the canvas's edges (room above the head), by at most the canvas's size |
+| `frame` | `[x0, y0, x1, y1]`: the head-and-chest window a player shows by default, as a half-body character fills its canvas: at least 16 px wide and tall. It may reach past the canvas's edges (room above the head), by at most the canvas's size |
 | `body` | the body's points, each `[x, y, confidence]`: `hip_l`, `hip_r`, `ankle_l`, `ankle_r` (required) and `knee_*`, `shoulder_*`, `elbow_*`, `wrist_*`, `neck`, where `_r` is the character's right, on the viewer's left; `ground_y`, the line the soles stand on (required); `hem_y` and `hem_x` (`[left, right]`), where a skirt or a coat ends (missing: nothing hangs); `conf`, how sure the pose estimate is overall |
 | `hair_bottom_y` | the lowest row of the hair: long hair swings with its full weight there, not at the feet |
 

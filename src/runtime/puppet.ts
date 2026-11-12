@@ -1945,7 +1945,7 @@ export class Puppet {
     if (!this.model || this.anchorModel !== this.model) return null
     const A = this.model.anchors, P = this.params, h = A.head
     const x = name === 'head' ? h.cx : A.chest?.cx ?? h.cx
-    const y = name === 'head' ? h.cy : A.chest?.cy ?? (A.neck_y + A.bottom_y) / 2
+    const y = name === 'head' ? h.cy : A.chest?.cy ?? (A.neck_y + (this.fb ? this.fb.hy : A.bottom_y)) / 2
     const radius = name === 'head' ? h.rx : h.rx * 1.5
     const neck: [number, number] = [0, 0]
     if (name === 'head') this.bodyOffset(h.cx, A.neck_y, P, neck)

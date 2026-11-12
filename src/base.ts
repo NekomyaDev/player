@@ -172,6 +172,9 @@ function inRange(P: Params) {
 }
 const finite = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
 const FITS: readonly Fit[] = ['frame', 'whole', 'knee']
+/** the deepest a recorded pose may crouch or dip a full-body character (a share of its frame's height): live ones reach
+ *  about 0.07, and a whole frame's height would fold the legs past the feet */
+const DOWN = 0.15
 
 export abstract class PlayerBase<Info extends { expressions: { id: string }[] }> implements Host {
   readonly canvas: HTMLCanvasElement
@@ -457,8 +460,11 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
     Object.assign(f.params, pose.params)
     inRange(f.params)
     Object.assign(f.move, { x: finite(M?.x, 0), y: finite(M?.y, 0), s: finite(M?.s, 1) })
-    const g = this.grounded
-    this.ground = { crouch: g ? clamp(finite(pose.crouch, 0), -1, 0) : 0, dip: g ? clamp(finite(pose.dip, 0), -1, 0) : 0, talk: g ? clamp(finite(pose.talk, 0), -1, 0) : 0 }
+    // a full-body character stands on the ground: a pose lifts it (a hop's flight) but never sinks it, and crouches and
+    // dips it no deeper than live motion could
+    const g = this.grounded, down = (v: unknown) => (g ? clamp(finite(v, 0), -DOWN, 0) : 0)
+    if (g) f.move.y = Math.max(0, f.move.y)
+    this.ground = { crouch: down(pose.crouch), dip: down(pose.dip), talk: down(pose.talk) }
     Object.assign(V, { x: finite(W?.x, V.x), y: finite(W?.y, V.y), zoom: finite(W?.zoom, V.zoom), head: typeof W?.head === 'boolean' ? W.head : V.head,
       fit: FITS.includes(W?.fit as Fit) ? W!.fit : V.fit })
     const expr = this.shownExpr
@@ -521,6 +527,9 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
     // expressions ease in and out (one no longer shown eases back to 0); dozing hides them, each is a face with open eyes
     for (const k of Object.keys(this.expr)) if (!(k in E)) E[k] = 0
     for (const k of Object.keys(E)) E[k] += ((this.expr[k] ?? 0) * (1 - A.awayW) - E[k]) * Math.min(1, dt * 8)
+    // what the drivers wrote, kept to numbers (a NaN would stay in a full-body character's springs for good)
+    const M = f.move
+    M.x = finite(M.x, 0); M.y = finite(M.y, 0); M.s = finite(M.s, 1); f.talk = finite(f.talk, 0)
     this.place(A.y)
     this.show(dt)
     this.onFrame?.(this.getPose())

@@ -3,7 +3,8 @@
 ## 0.5.0
 
 Full-body characters play, standing on the ground, and the free plan's mark has its new look. Half-body characters
-draw as in 0.4, to the pixel. A page written for 0.4 needs no change.
+draw as in 0.4, to the pixel. A page written for 0.4 needs no change; TypeScript code that builds a `Frame` or a
+`ModelInfo` of its own (a test's stand-in) adds the new fields.
 
 ### New
 
@@ -25,6 +26,7 @@ draw as in 0.4, to the pixel. A page written for 0.4 needs no change.
 - **The free plan's mark over the character** is smaller and white inside a thin dark line, so it shows on light
   clothes as on dark ones, as on livliv.ai. The corner mark and the featured characters are unchanged.
 - Lip sync puts its talking bob in `frame.talk` instead of adding it to `frame.move.y`; the picture moves as before.
+- What drivers write to `frame.move` and `frame.talk` is kept to numbers: a NaN counts as no move.
 - Full-body characters are no longer refused.
 
 ## 0.4.0

@@ -223,14 +223,16 @@ try {
       'read as one': r.fullBody === true && r.size.split(',')[1] > r.size.split(',')[0],
       'the shots': r.shots.frame.head > r.shots.knee.head && r.shots.knee.head > r.shots.whole.head && Object.values(r.shots).every((x) => x.share > 0.02),
       'the pose': near(r.pose.crouch, -0.03) && near(r.pose.dip, -0.01) && near(r.pose.talk, -0.01) && r.pose.y === 0 && near(r.pose.x, 0.05) && r.pose.fit === 'whole',
-      'the feet stay': r.restFeet > 2 && Math.abs(r.crouchFeet - r.restFeet) <= 1 && r.sunkFeet < r.restFeet - 3,
+      'the feet stay': r.restFeet > 2 && Math.abs(r.crouchFeet - r.restFeet) <= 1 && Math.abs(r.sunkFeet - r.restFeet) <= 1 && r.liftFeet > r.restFeet + 3,
       'replayed exactly': r.replayed === 0 && r.without > 0.001,
       'a lean away is not followed': r.leanAway.y === 0 && r.leanAway.crouch === 0,
+      'a NaN from a driver': r.afterNaN.x === 0 && r.afterNaN.hem && r.afterNaN.share > 0.02,
+      'a recorded pose held to live ranges': r.held.y === 0 && r.held.crouch === -0.15 && r.held.dip === -0.15,
       'anchors': r.anchors.head && r.anchors.body,
     }
     const wrong = Object.entries(checks).filter(([, ok]) => !ok).map(([k]) => k)
     if (wrong.length) failed++
-    console.log(`${wrong.length ? 'FAIL' : 'ok  '} a full-body character${wrong.length ? `: ${wrong.join(', ')}: ${JSON.stringify(r)}` : `: head ${r.shots.frame.head.toFixed(2)} / ${r.shots.knee.head.toFixed(2)} / ${r.shots.whole.head.toFixed(2)} of the width by shot, feet ${r.restFeet} px up at rest, ${r.crouchFeet} crouched, ${r.sunkFeet} sunk whole`}`)
+    console.log(`${wrong.length ? 'FAIL' : 'ok  '} a full-body character${wrong.length ? `: ${wrong.join(', ')}: ${JSON.stringify(r)}` : `: head ${r.shots.frame.head.toFixed(2)} / ${r.shots.knee.head.toFixed(2)} / ${r.shots.whole.head.toFixed(2)} of the width by shot, feet ${r.restFeet} px up at rest, ${r.crouchFeet} crouched, ${r.sunkFeet} asked to sink, ${r.liftFeet} lifted`}`)
   }
 
   // a model that breaks while it is built (see runKeep): the character before stays, to the pixel

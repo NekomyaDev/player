@@ -240,6 +240,7 @@
             "hem_y": { "type": "number", "description": "Where a skirt or a coat ends; missing: nothing hangs." },
             "hem_x": { "type": "array", "prefixItems": [{ "type": "number" }, { "type": "number" }], "items": false, "minItems": 2, "description": "The hem's left and right ends at hem_y." }
           },
+          "patternProperties": { "^x-": {} },
           "additionalProperties": false,
           "description": "Full-body characters (4.1): the body's points as [x, y, confidence] (_r is the character's right, on the viewer's left), its ground line and its hem. With it the model needs anchors.frame and lists full_body in requires."
         },

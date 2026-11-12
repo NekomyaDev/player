@@ -491,7 +491,7 @@ above works on it as on a half-body one; what differs is the shot and how it mov
 - **Its feet stay on the ground**: the upper body turns and leans as one piece above the waist, and the whole figure
   sways from the ankles. A face tracker's sideways move sways it instead of sliding it; leaning toward the camera
   crouches it a little (the legs shorten, the feet stay) and leaning away is not followed; closer and further scale it
-  about the ground line. A hop crouches, flies and lands. Lip sync's talking bob dips the upper body. The hips follow
+  (about the ground line when the whole figure shows). A hop crouches, flies and lands. Lip sync's talking bob dips the upper body. The hips follow
   the upper body and shift their weight a little by themselves, and a skirt's or coat's hem hangs behind them.
 - **Drivers** see `frame.grounded`, and move it with `frame.move` and `frame.talk` as on any character: the player
   turns them into the sway, the crouch and the dip.
@@ -546,8 +546,9 @@ Before a model is loaded, after `dispose()` or once the context is lost, it draw
 A full-body character's pose has three more numbers, as its feet stay on the ground: `crouch`, how far the hips went
 down (a hop's crouch, a lean toward the camera), and `dip`, how far the upper body dipped on a syllable, both shares of
 the frame's height (<= 0), and `talk`, the talking bob the dip came from. Its `move.y` is only a hop's lift (>= 0) and
-`move.x` sways it from the ankles. `renderPose()` draws the crouch and the dip; a half-body character's pose has none of
-the three, and a half-body character ignores them.
+`move.x` sways it from the ankles. `renderPose()` draws the crouch and the dip, holding a pose from elsewhere to what
+live motion could do (no sinking, a crouch or dip of at most 0.15); a half-body character's pose has none of the three,
+and a half-body character ignores them.
 
 ## Response profiles
 
