@@ -26,8 +26,11 @@ export class TalkMotion {
   act = 0
   /** how far to move the picture up, as a share of its height. Half-body characters are cut off at the bottom
    *  edge, so a hop must never lift that edge into view: with bounce on the character sits lower by the most a hop
-   *  reaches, and a hop only brings it back up to where it was (always <= 0) */
+   *  reaches, and a hop only brings it back up to where it was (always <= 0). A full-body character (grounded) stands
+   *  where it was and dips on a syllable instead (Puppet.setMove makes that a crouch: the feet stay on the ground) */
   hop = 0
+  /** the character stands on a ground line (a full-body model) */
+  grounded = false
   stats = { onsets: 0, nods: 0, brows: 0, blinks: 0 }
   private armed = true
   private valley = 0
@@ -87,7 +90,8 @@ export class TalkMotion {
     o.eyeBallX = -P.eyeBallX * 0.7 * this.act
     o.eyeBallY = -P.eyeBallY * 0.7 * this.act
     const cap = 0.02 * this.amount
-    this.hop = this.bounce ? Math.min(cap, Math.max(0, this.lift.x)) - cap : 0
+    const up = Math.min(cap, Math.max(0, this.lift.x))
+    this.hop = this.bounce ? (this.grounded ? -up : up - cap) : 0
     return o
   }
 

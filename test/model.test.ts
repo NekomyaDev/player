@@ -52,7 +52,7 @@ describe('rig', () => {
     assert.ok(model.rig!.body!.bust! > 0, 'the fixture saves one')
     // the model's fields without the GPU: each layer stands in for what buildLayer makes of it
     const p = Object.assign(Object.create(Puppet.prototype) as Puppet, {
-      procJaw: 0, lidCurve: false, chains: {}, drive: {}, buildLayer: (def: unknown) => ({ def, rest: new Float32Array(0) }),
+      procJaw: 0, lidCurve: false, chains: {}, drive: {}, pv: {}, buildLayer: (def: unknown) => ({ def, rest: new Float32Array(0) }),
     })
     const build = (p as unknown as { build: (m: ModelDef, imgs: unknown[], k: undefined, built: unknown[]) => void }).build
     build.call(p, model, model.layers.map(() => ({ main: {}, frames: [] })), undefined, [])

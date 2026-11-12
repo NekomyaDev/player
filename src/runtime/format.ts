@@ -2,14 +2,16 @@
 // runtime has always drawn from (ModelDef, the v3 `livemaker-puppet` layout), and v3 itself, read as it is, for good.
 // The runtime below never sees a v4 file: what changed in v4 is names, places and what is left out, not how a model
 // is drawn (a v3 model and its v4 export draw the same pixels).
+import { BODY_NEEDS, BODY_POINTS } from './fullbody'
 import type { ChainDef, LayerDef, ModelDef, Tuning } from './puppet'
 
 /** model.json's `format` and the newest `version` of it this player reads. A v4 file names, in `requires`, the
- *  features a player must have to draw it right (FEATURES: none in 4.0); fields it does not know it ignores */
+ *  features a player must have to draw it right (FEATURES: full_body since 4.1, a full-body character); fields it does
+ *  not know it ignores */
 export const FORMAT = 'livliv-model', FORMAT_VERSION = 4
 /** the format every model built before v4 has, and exports made until then: read as it is, whatever comes later */
 export const LEGACY_FORMAT = 'livemaker-puppet', LEGACY_VERSION = 3
-export const FEATURES: readonly string[] = []
+export const FEATURES: readonly string[] = ['full_body']
 
 /** names by language (BCP 47 tag -> text): an expression's, a layer's */
 export type Labels = Record<string, string>
@@ -49,6 +51,9 @@ const BIG = 1e6
 const GROUPS = ['head', 'body', 'hair_back', 'hair_side', 'hair_front', 'hair_inner']
 /** the lattice every layer's mesh sits on, in model px (the same for all: see Puppet.buildLayer) */
 export const latticeCell = (w: number, h: number) => Math.max(6, Math.round(Math.max(w, h) / 128))
+/** a model's lattice: rig.lattice when the model pins it (a full-body model keeps the head-chest density on its tall
+ *  canvas), else latticeCell of its canvas */
+export const latticeOf = (m: Pick<ModelDef, 'canvas' | 'rig'>) => m.rig?.lattice ?? latticeCell(m.canvas[0], m.canvas[1])
 const IMAGE = /^textures\/[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:webp|png)$/
 const FILE = /^(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9_][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$/
 
@@ -65,7 +70,6 @@ export function readModel(raw: unknown, lang = uiLang()): ModelDef {
   if (m.format === undefined || m.format === LEGACY_FORMAT) {
     const v = (m.version as number | undefined) ?? LEGACY_VERSION
     if (v > LEGACY_VERSION) throw coded('not-a-model', `this model says format "${LEGACY_FORMAT}" version ${v}, which never existed`)
-    halfBody(m)
     check(m as unknown as ModelDef)
     read.add(m)
     return m as unknown as ModelDef
@@ -77,21 +81,10 @@ export function readModel(raw: unknown, lang = uiLang()): ModelDef {
   }
   const missing = ((m.requires as string[] | undefined) || []).filter((f) => !FEATURES.includes(f))
   if (missing.length) throw coded('missing-feature', `this model needs ${missing.join(', ')}, which this player does not have: update the player`)
-  halfBody(m)
   const out = lower(m as unknown as V4, lang)
   check(out)
   read.add(out)
   return out
-}
-
-/** A full-body character (livliv.ai's newer kind) has anchors.body: its hips, its ankles and the ground line its feet
- *  stand on, in a tall canvas the player frames by anchors.frame. This player draws half-body characters: it would show
- *  the whole canvas, the feet sliding with every move, on too coarse a mesh. A half-body model never has anchors.body */
-function halfBody(m: Record<string, unknown>) {
-  const body = (m.anchors as { body?: unknown } | null | undefined)?.body
-  if (body != null && typeof body === 'object') {
-    throw coded('missing-feature', 'this is a full-body character: full-body characters arrive in a later version of LivLiv Player')
-  }
 }
 
 /** what any model must be before it is drawn, whatever wrote it: sizes and counts in range (LIMITS), numbers finite,
@@ -130,6 +123,27 @@ function check(m: ModelDef) {
     for (const [k, v] of Object.entries(o as object)) sane(v, `${what}.${k.slice(0, 60)}`)
   }
   sane(A.collar_y, 'anchors.collar_y')
+  // a full-body model: its frame on the canvas (it may reach past an edge, as a half-body build's crop
+  // leaves room above the head; within a canvas of it, like a layer's box), its body's points as [x, y, confidence],
+  // the hips above the ankles; it is drawn by its frame, so a body without one is not valid
+  if (A.frame != null) {
+    nums(A.frame, 4, 4, 'anchors.frame')
+    const [x0, y0, x1, y1] = A.frame
+    if (!(x0 >= -w && y0 >= -h && x1 <= 2 * w && y1 <= 2 * h && x1 - x0 >= 16 && y1 - y0 >= 16)) bad('anchors.frame is not a box on the canvas')
+  }
+  sane(A.hair_bottom_y, 'anchors.hair_bottom_y')
+  if (A.body != null) {
+    const B = A.body as unknown as Record<string, unknown>
+    if (typeof B !== 'object' || Array.isArray(B)) bad('anchors.body is not an object')
+    BODY_POINTS.forEach((k, i) => { if (i < BODY_NEEDS || B[k] != null) nums(B[k] ?? null, 3, 3, `anchors.body.${k}`); if (i < BODY_NEEDS && B[k] == null) bad(`anchors.body has no ${k}`) })
+    if (!inRange(B.ground_y)) bad('anchors.body.ground_y is not a number in range')
+    sane(B.hem_y, 'anchors.body.hem_y'); nums(B.hem_x, 2, 2, 'anchors.body.hem_x')
+    const b = A.body
+    if (Math.max(b.hip_l[1], b.hip_r[1]) >= Math.min(b.ankle_l[1], b.ankle_r[1])) bad('anchors.body has its hips below its ankles')
+    if (Math.min(b.hip_l[1], b.hip_r[1]) <= A.neck_y + 1) bad('anchors.body has its hips above its neck')
+    if (!(A.face[2] > A.face[0])) bad('anchors.face has no width')
+    if (A.frame == null) bad('anchors.body comes without anchors.frame')
+  }
   fields(A.jaw, 'top chin half open round wide', 'anchors.jaw')
   fields(A.chest, 'cx cy rx ry', 'anchors.chest')
   for (const b of list(A.eyes, LIMITS.eyes, 'anchors.eyes')) { if (b == null) bad('anchors.eyes has an empty entry'); nums(b, 4, 4, 'anchors.eyes') }
@@ -141,11 +155,14 @@ function check(m: ModelDef) {
     nums(line.x, n, n, 'a brow line'); nums(line.bottom ?? [], n, n, 'a brow line'); nums(line.lid ?? [], n, n, 'a brow line')
     if (line.cap != null) nums(line.cap, n, n, 'a brow line')
   }
-  fields(m.tuning, 'turn nod hair blink expr mouth breath hairFront hairBack', 'tuning')
+  fields(m.tuning, 'turn nod hair blink expr mouth breath hairFront hairBack fringe', 'tuning')
   const R = m.rig
   fields(R, 'yaw pitch roll bulge bulge_shape hair_limit wind breath sway brow pitch_ease jaw', 'rig')
   nums(R?.bulge_extent, 3, 5, 'rig.bulge_extent'); nums(R?.drift, 2, 2, 'rig.drift'); nums(R?.hair_drive, 3, 3, 'rig.hair_drive')
   fields(R?.body, 'yaw roll breath bust', 'rig.body'); fields(R?.neck, 'twist reach', 'rig.neck')
+  // a lattice of 1 px would be millions of vertices before LIMITS could say so: whole, and at least the smallest cell a
+  // canvas ever gets
+  if (R?.lattice != null && !(Number.isInteger(R.lattice) && R.lattice >= 6 && R.lattice <= 256)) bad('rig.lattice is not a whole number from 6 to 256')
   if (R?.hair != null) for (const k of ['front', 'back', 'side'] as const) nums(R.hair[k], 5, 5, `rig.hair.${k}`)
   for (const c of list(R?.chains, LIMITS.chains, 'rig.chains') as (ChainDef | null)[]) {
     if (!c || typeof c.id !== 'string') bad('a chain has no id')
@@ -158,7 +175,7 @@ function check(m: ModelDef) {
     fields(c, 'depth damp drive hang wind freq limit sigma reach', what)
     weights(c!.bias, `${what}'s bias`)
   }
-  const cell = latticeCell(w, h)
+  const cell = latticeOf(m)
   const bangs = m.layers.find((L) => L?.group === 'hair_front')?.bones
   let images = 0, vertices = 0, skinned = 0, read = 0
   for (const L of m.layers) {

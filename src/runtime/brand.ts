@@ -10,15 +10,16 @@ export const WINK = 'M293.5 69H312.5A8 8 0 0 1 312.5 85H293.5A8 8 0 0 1 293.5 69
 
 /** Free-plan watermark, sized by the frame's shorter side so a portrait and a landscape frame carry the same mark: a
  *  light logo over the character (`center` of the shorter side wide, its middle at `centerY` of the height, above where
- *  subtitles reach; all white: its coral dots would read as marks on a face in a close-up; a soft shadow `centerBlur` of
- *  its own height so it still shows on white) plus the solid coloured one in a corner (`corner` wide, at least
+ *  subtitles reach; all white: its coral dots would read as marks on a face in a close-up; white at `centerAlpha` inside a
+ *  thin dark line, `centerEdge` wide in the logo's own units at `centerRim`, so it shows on light clothes and dark alike) plus the solid coloured one in a corner (`corner` wide, at least
  *  `cornerMin` CSS px, `margin` from both edges, at least 12 CSS px). The owner's own text mark takes the same corner,
  *  `text` of the shorter side tall (at least 12 CSS px). <Watermark> on livliv.ai and drawWatermark() in recordings and
- *  the SDK draw it from these numbers. Until 2026-10-21: center 0.62 at 0.6, alpha 0.38, coral dots. Until 2026-10-31:
+ *  the SDK draw it from these numbers. Before the thin line: center 0.38, alpha 0.18, a soft shadow: gone on light
+ *  clothes. Until 2026-10-21: center 0.62 at 0.6, alpha 0.38, coral dots. Until 2026-10-31:
  *  center 0.45 at 0.7, alpha 0.2; the corner logo 5 % of the frame's height (29 % of a portrait video's width, 9 % of a
  *  landscape one's), 0.45 of its own height from the edges; the text 2.2 % of the height in videos, 13 px elsewhere. */
 export const WATERMARK = {
-  center: 0.38, centerY: 0.62, centerAlpha: 0.18, centerShadow: 'rgba(0,0,0,.25)', centerBlur: 0.06,
+  center: 0.3, centerY: 0.62, centerAlpha: 0.3, centerRim: 0.2, centerEdge: 3.2,
   corner: 0.13, cornerMin: 64, margin: 0.035, text: 0.026,
   top: 0.12,  // a portrait video's corner mark starts this far down (cornerSpot)
 }
@@ -90,15 +91,41 @@ export function drawMarkText(g: CanvasRenderingContext2D, w: number, h: number, 
   g.restore()
 }
 
+const SPRITE_PAD = 4  // room for the dark line around the logo
+const sprites = new Map<string, OffscreenCanvas | HTMLCanvasElement>()
+
+function sprite(w: number, h: number) {
+  return typeof OffscreenCanvas === 'undefined' ? Object.assign(document.createElement('canvas'), { width: w, height: h }) : new OffscreenCanvas(w, h)
+}
+
+/** The logo over the character, cw × ch px, on a transparent picture: white at centerAlpha inside a thin dark line (the
+ *  line drawn apart so that it shows only outside the letters). Kept per size and eye: recordings draw it every frame. */
+function centerLogo(cw: number, ch: number, ms: number) {
+  const eye = Math.round(eyeOpen(ms) * 10), key = `${ch.toFixed(2)}:${eye}`
+  let out = sprites.get(key)
+  if (out) return out
+  const { centerAlpha, centerRim, centerEdge } = WATERMARK
+  const w = Math.ceil(cw) + SPRITE_PAD * 2, h = Math.ceil(ch) + SPRITE_PAD * 2, right = cw + SPRITE_PAD, bottom = ch + SPRITE_PAD
+  const ring = sprite(w, h), r = ring.getContext('2d') as CanvasRenderingContext2D
+  drawLogo(r, right, bottom, ch, '#000', ms, '#000', centerEdge, '#000')
+  r.globalCompositeOperation = 'destination-out'
+  drawLogo(r, right, bottom, ch, '#000', ms, '#000')
+  out = sprite(w, h)
+  const g = out.getContext('2d') as CanvasRenderingContext2D
+  g.globalAlpha = centerRim
+  g.drawImage(ring, 0, 0)
+  g.globalAlpha = centerAlpha
+  drawLogo(g, right, bottom, ch, '#fff', ms, '#fff')
+  if (sprites.size > 64) sprites.clear()
+  sprites.set(key, out)
+  return out
+}
+
 /** Draws the free-plan watermark (see WATERMARK) onto a w × h frame; the canvas twin of <Watermark>. `px` and `top`:
  *  as cornerSpot */
 export function drawWatermark(g: CanvasRenderingContext2D, w: number, h: number, ms = 0, px = 1, top = false) {
-  const { center, centerY, centerAlpha, centerShadow, centerBlur } = WATERMARK
+  const { center, centerY } = WATERMARK
   const cw = Math.min(w, h) * center, ch = cw * LOGO_BOX[3] / LOGO_BOX[2]
-  g.save()
-  g.globalAlpha = centerAlpha
-  g.shadowColor = centerShadow; g.shadowBlur = ch * centerBlur
-  drawLogo(g, (w + cw) / 2, h * centerY + ch / 2, ch, '#fff', ms, '#fff')
-  g.restore()
+  g.drawImage(centerLogo(cw, ch, ms), (w - cw) / 2 - SPRITE_PAD, h * centerY - ch / 2 - SPRITE_PAD)
   drawCornerLogo(g, w, h, ms, px, top)
 }

@@ -16,7 +16,7 @@ const v3 = () => ({
 test('the constants', () => {
   assert.equal(FORMAT, 'livliv-model')
   assert.equal(FORMAT_VERSION, 4)
-  assert.deepEqual(FEATURES, [])
+  assert.deepEqual(FEATURES, ['full_body'])
 })
 
 test('v3 is read as it is: the same object, untouched', () => {
@@ -49,18 +49,58 @@ test('refusals', () => {
   assert.throws(() => readModel({ ...example(), layers: [] }), /no layers/)
 })
 
-test('a full-body character waits for a later version; a half-body one is never taken for one', () => {
-  // as livliv.ai writes a full-body build: the body's points [x, y, confidence], its ground line, the frame it is drawn by
+// a full-body model: anchors.body with anchors.frame, rig.lattice
+const tall = () => {
+  const m = v3() as ReturnType<typeof v3> & { anchors: Record<string, unknown>; rig?: Record<string, unknown> }
+  m.canvas = [64, 128]
+  m.anchors = { ...m.anchors, bottom_y: 120, frame: [0, 0, 64, 96], hair_bottom_y: 60,
+    body: { hip_l: [36, 70, 0.9], hip_r: [28, 70, 0.9], ankle_l: [36, 116, 0.8], ankle_r: [28, 116, 0.8], knee_l: [36, 94, 0.8], ground_y: 122, hem_y: 84, hem_x: [20, 44] } }
+  m.layers[0] = { ...m.layers[0], h: 128 }
+  m.rig = { lattice: 6 }
+  return m
+}
+
+test('a full-body model is read; its body, frame and lattice are checked', () => {
+  assert.equal(readModel(tall()).anchors.body!.ground_y, 122)
+  const bad = (f: (m: ReturnType<typeof tall>) => void, why: RegExp) => { const m = tall(); f(m); assert.throws(() => readModel(m), why) }
+  bad((m) => { delete (m.anchors.body as Record<string, unknown>).ankle_r }, /anchors.body has no ankle_r/)
+  bad((m) => { (m.anchors.body as Record<string, unknown>).hip_l = [36, 70] }, /anchors.body.hip_l is not a list of 3 to 3 numbers/)
+  bad((m) => { (m.anchors.body as Record<string, unknown>).knee_l = [36, 'x', 1] }, /anchors.body.knee_l/)
+  bad((m) => { (m.anchors.body as Record<string, unknown>).hip_r = [28, 118, 0.9] }, /hips below its ankles/)
+  bad((m) => { (m.anchors.body as Record<string, unknown>).ground_y = NaN }, /ground_y/)
+  bad((m) => { (m.anchors.body as Record<string, unknown>).hip_l = [36, 30, 0.9] }, /hips above its neck/)
+  bad((m) => { (m.anchors.body as Record<string, unknown>).hem_x = [20] }, /hem_x/)
+  bad((m) => { delete m.anchors.frame }, /without anchors.frame/)
+  bad((m) => { m.anchors.frame = [0, 0, 64, 300] }, /not a box on the canvas/)
+  bad((m) => { m.anchors.frame = [0, 0, 8, 8] }, /not a box on the canvas/)
+  assert.doesNotThrow(() => { const m = tall(); m.anchors.frame = [0, -10, 64, 86]; readModel(m) })
+  bad((m) => { m.anchors.body = 'x' }, /anchors.body is not an object/)
+  bad((m) => { m.rig = { lattice: 1 } }, /rig.lattice is not a whole number from 6 to 256/)
+  bad((m) => { m.rig = { lattice: 12.5 } }, /rig.lattice/)
+  // a pinned lattice counts the vertices LIMITS holds a model to
+  const big = tall()
+  big.canvas = [8192, 8192]; big.layers = [0, 1].map((i) => ({ ...big.layers[0], id: `l${i}`, w: 8192, h: 8192 }))
+  big.anchors.frame = [0, 0, 8192, 8192]
+  big.rig = { lattice: 6 }
+  assert.throws(() => readModel(big), /vertices/)
+  big.rig = { lattice: 64 }
+  assert.doesNotThrow(() => readModel(big))
+})
+
+test('a full-body v4 model keeps its body, frame, lattice and fringe; a half-body one is never taken for one', () => {
   const body = { hip_l: [600, 1700, 0.9], hip_r: [900, 1700, 0.9], ankle_l: [620, 2900, 0.9], ankle_r: [880, 2900, 0.9], ground_y: 2990 }
-  const tall = example()
-  tall.canvas = [1536, 3072]; tall.anchors.body = body; tall.anchors.frame = [0, 0, 1536, 1536]
-  for (const m of [tall, { ...v3(), anchors: { ...v3().anchors, body } }]) {
-    assert.throws(() => readModel(m), (e: Error & { code?: string }) => e.code === 'missing-feature' && /full-body characters arrive in a later version/.test(e.message))
-  }
+  const src = example()
+  src.canvas = [1536, 3072]; src.anchors.body = body; src.anchors.frame = [0, 0, 1536, 1536]; src.anchors.hair_bottom_y = 1200
+  src.rig = { ...src.rig, lattice: 12 }; src.tuning = { ...src.tuning, fringe: 1.5 }
+  // a writer lists the feature (FORMAT.md), so that a player without it refuses the model; this one reads it either way
+  assert.doesNotThrow(() => readModel({ ...src, requires: ['full_body'] }))
+  const m = readModel(src)
+  assert.deepEqual(m.anchors.body, body); assert.deepEqual(m.anchors.frame, [0, 0, 1536, 1536]); assert.equal(m.anchors.hair_bottom_y, 1200)
+  assert.equal(m.rig!.lattice, 12); assert.equal(m.tuning!.fringe, 1.5)
   // a half-body build has no anchors.body (the featured characters, all half-body, are read in characters.test.ts)
   const half = example()
   assert.equal(half.anchors.body, undefined)
-  assert.doesNotThrow(() => readModel(half))
+  assert.equal(readModel(half).anchors.body, undefined)
   half.anchors.body = null
   assert.doesNotThrow(() => readModel(half))
 })

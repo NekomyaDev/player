@@ -10,15 +10,17 @@ type Move = { offsets: Partial<Params>; x: number; y: number }
 const DUR: Record<Exclude<ActionId, 'away'>, number> = { nod: 0.95, shake: 1.05, tilt: 1.8, hop: 0.65, shy: 2.4 }
 const env = (t: number, d: number) => smooth(0, 0.18, t) * (1 - smooth(d - 0.22, d, t))
 
-/** offsets at t seconds into an action (y: share of the picture's height, up) */
-function curve(id: Exclude<ActionId, 'away'>, t: number): Move {
+/** offsets at t seconds into an action (y: share of the picture's height, up). grounded (a full-body model):
+ *  the hop also lands, a short dip after the flight (Puppet.setMove makes the dips crouches, the feet on the ground) */
+function curve(id: Exclude<ActionId, 'away'>, t: number, grounded = false): Move {
   const d = DUR[id], e = env(t, d), o: Partial<Params> = {}
   let y = 0
   if (id === 'nod') o.angleY = -(t < 0.45 ? 11 * Math.sin((Math.PI * t) / 0.45) : 6 * Math.sin((Math.PI * Math.min(t - 0.45, 0.45)) / 0.45)) * e
   if (id === 'shake') { o.angleX = 13 * Math.sin((2 * Math.PI * t) / 0.5) * e; o.bodyX = o.angleX * 0.15 }
   if (id === 'tilt') { o.angleZ = 11 * e; o.angleX = 3 * e; o.angleY = 2 * e }
   if (id === 'hop') {  // crouch, then up: a half-body character can't rise past its cut edge, so for it this is a bob
-    y = t < 0.2 ? -0.025 * Math.sin((Math.PI * t) / 0.2) : t < 0.6 ? 0.04 * Math.sin((Math.PI * (t - 0.2)) / 0.4) : 0
+    y = t < 0.2 ? -0.025 * Math.sin((Math.PI * t) / 0.2) : t < 0.6 ? 0.04 * Math.sin((Math.PI * (t - 0.2)) / 0.4)
+      : grounded ? -0.012 * Math.sin((Math.PI * Math.min(t - 0.6, 0.05)) / 0.05) : 0
     o.angleY = t > 0.2 && t < 0.6 ? 5 * Math.sin((Math.PI * (t - 0.2)) / 0.4) * e : 0
   }
   if (id === 'shy') { o.angleY = -12 * e; o.angleX = 9 * e; o.angleZ = -4 * e; o.eyeBallX = 0.7 * e; o.eyeBallY = -0.5 * e }
@@ -38,6 +40,8 @@ export class ActionPlayer {
   awayW = 0
   private off: Partial<Params> = {}
   y = 0
+  /** the character stands on a ground line (a full-body model): the hop lands with a dip */
+  grounded = false
 
   play(id: ActionId) {
     if (id === 'away') { this.setAway(!this.away); return }
@@ -55,7 +59,7 @@ export class ActionPlayer {
     for (const p of this.playing) {
       p.t += dt
       if (p.out >= 0) p.out += dt
-      const m = curve(p.id, Math.min(p.t, DUR[p.id])), f = p.out < 0 ? 1 : 1 - smooth(0, 0.15, p.out)
+      const m = curve(p.id, Math.min(p.t, DUR[p.id]), this.grounded), f = p.out < 0 ? 1 : 1 - smooth(0, 0.15, p.out)
       for (const [k, v] of Object.entries(m.offsets) as [keyof Params, number][]) o[k] = (o[k] ?? 0) + v * f
       this.y += m.y * f
     }

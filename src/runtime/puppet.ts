@@ -17,7 +17,10 @@
 //    the bangs where it lies over them
 //  - body: lags the head turn / tilt, breathes (shoulders + chest), optional chest spring
 import { projectedAnchor, type AnchorName, type AttachmentAnchor } from '../anchors'
-import { LIMITS, coded, latticeCell, readModel, type Labels, type ModelFiles, type ModelMeta } from './format'
+import { LIMITS, coded, latticeOf, readModel, type Labels, type ModelFiles, type ModelMeta } from './format'
+import { CROUCH_CAM, FB_ANKLE, FB_ANKLE_BAND, FB_CAM_SWAY, FB_GAIN, FB_HEM_C, FB_HEM_K, FB_HEM_LAG, FB_HEM_MAX, FB_HEM_WIND,
+  FB_HIP_BACK, FB_HIP_C, FB_HIP_IDLE, FB_HIP_K, FB_HIP_REACH, FB_HIP_SLIDE, FB_HIP_TILT, FB_SHOULDER_ANSWER, FB_WAIST,
+  fitBox, fullBody, type BodyAnchors, type Fit, type FullBody } from './fullbody'
 import { PARAM_RANGES, defaultParams, smooth, type Params } from './params'
 
 export { PARAM_RANGES, defaultParams, smooth, type Params }
@@ -72,6 +75,14 @@ export interface ModelDef {
   anchors: {
     head: { cx: number; cy: number; rx: number; ry: number }
     face: Box; neck_y: number; top_y: number; bottom_y: number
+    /** full-body models: the body's points and ground line. With it the upper body turns about the hips, the
+     *  figure sways from the ankles with the feet on the ground, the hips and a hem follow (fullbody.ts) */
+    body?: BodyAnchors
+    /** full-body models: the head-chest window the camera fits by default (Puppet.fit), as a half-body picture fills
+     *  its canvas */
+    frame?: Box
+    /** full-body models: the lowest hair pixel, where long hair swings with its full weight */
+    hair_bottom_y?: number
     /** the top of the choker or collar (drawn views of a multi-view character) */
     collar_y?: number
     hair_root_y: number; eyes?: Box[]
@@ -152,6 +163,9 @@ export type Rig = {
   /** the jaw drop for builds whose edits measured none, as a share of the face height at the open frame (procJaw,
    *  0.015, when missing) */
   jaw?: number
+  /** the mesh lattice's cell (model px), pinned: a full-body model keeps the head-chest density (12) on its tall
+   *  canvas. Missing: from the canvas (format.ts latticeCell) */
+  lattice?: number
 }
 /** one swinging piece: a rope of points (root first, model px) pulled toward its drawn shape in the frame of what it
  *  hangs from, thrown by that root's acceleration, kept hanging down by gravity as far as `hang` says. Cubism's
@@ -192,9 +206,23 @@ export const defaultRig = (): Rig => ({
  *  freely the hair swings; hairFront (the bangs' springs) and hairBack (long hair's, and the swinging pieces': chains)
  *  each take its place when set, so a model saved with hair alone moves both as before.
  *  gaze: the share of the iris's travel it uses, 0-1. Less shows less of what a far look uncovers in the whites and fixes
- *  none of it; above 1 only shows more, so it stops at 1 */
-export type Tuning = { turn: number; nod: number; hair: number; blink: number; expr: number; mouth: number; breath: number; hairFront?: number; hairBack?: number; gaze: number }
+ *  none of it; above 1 only shows more, so it stops at 1.
+ *  fringe: how far the bangs stand off the face, their depth times this (fringeScale): 0 lies on the face, more only up
+ *  to FRINGE_MAX */
+export type Tuning = { turn: number; nod: number; hair: number; blink: number; expr: number; mouth: number; breath: number; hairFront?: number; hairBack?: number; gaze: number; fringe?: number }
 export const defaultTuning = (): Tuning => ({ turn: 1, nod: 1, hair: 1, blink: 1, expr: 1, mouth: 1, breath: 1, gaze: 1 })
+/** the deepest the bangs go when tuning.fringe pulls them out: the usual 0.15 bangs reach 2x; at 0.45 (3x) strands
+ *  crossed the eyes on a turn. A layer drawn deeper keeps its own depth */
+export const FRINGE_MAX = 0.3
+/** what tuning.fringe at `k` does to a layer of depth `d`: a factor on its depth, 1 at k = 1 exactly (nothing else read), so a
+ *  character nobody moved it on draws as before bit for bit. Per layer, not per vertex: the fall-off at the skull's edge stays */
+export function fringeScale(d: number, k: number | undefined): number {
+  const f = typeof k === 'number' && Number.isFinite(k) && k >= 0 ? k : 1
+  if (f === 1 || !(d > 0)) return 1
+  return Math.min(Math.max(d, FRINGE_MAX), d * f) / d
+}
+/** how far tuning.fringe can go on a character whose bangs have depth `d` (2 at most; 0 when it has no bangs depth to scale) */
+export const fringeTop = (d: number) => (d > 0 ? Math.min(2, Math.max(d, FRINGE_MAX) / d) : 0)
 
 interface GLLayer {
   def: LayerDef
@@ -368,8 +396,29 @@ export class Puppet {
    *  edge the drawing is cut off at (half-body characters) above where `view` alone puts it: render() moves the
    *  picture down by whatever it would show */
   move = { x: 0, y: 0, s: 1 }
-  /** the drawing reaches its bottom edge (cut off there): set on load from anchors.bottom_y */
+  /** the drawing reaches its bottom edge (cut off there): set on load from anchors.bottom_y (never on a full-body model) */
   cutBottom = false
+  /** what the camera fits into the view on a full-body model: its head-chest frame (the default, as a half-body
+   *  picture), the whole figure, or down to the knees. A model without anchors.frame always fits its canvas */
+  fit: Fit = 'frame'
+  /** full-body models: the crouch and the talking dip automatic movement asks for (setMove; shares of the frame's
+   *  height, <= 0). The crouch drops the hips, the legs shorten as straight lines and the feet stay; the dip lowers
+   *  only what is above the waist band */
+  crouch = 0
+  dip = 0
+  /** full-body models: the share of the hips' slow shift of weight (0: they stay still); physicsScale scales
+   *  all of the hips' and the hem's motion */
+  fbIdle = 1
+  /** the model stands on a ground line (anchors.body): automatic movement keeps its feet there */
+  get grounded() { return !!this.fb }
+  private fb: FullBody | null = null
+  /** the hips' shift (model px) and its speed, their tilt (rad), the hem's spring (model px) */
+  private fbm = { hs: 0, hv: 0, tilt: 0, tanTilt: 0, hem: 0, hemV: 0, breath: 0 }
+  /** body layers take the hips' tilt and the hem on top (deform sets it per layer; hair has its own chains) */
+  private fbParts = false
+  /** a full-body model's pose, worked out once per change (bodyOffset runs for every vertex): the waist's and the
+   *  ankles' turns (rad, with their cos / sin), the hips' shift, the crouch and the dip (model px) */
+  private pv = { roll: NaN, cr: NaN, dp: NaN, mx: NaN, hs: NaN, tilt: NaN, aw: 0, cw: 1, sw: 0, aa: 0, ca: 1, sa: 0, x: 0, y: 0, dip: 0 }
   /** device pixels per CSS pixel at most (the power-saving mode draws at 1) */
   maxDpr = 2
   /** draw at exactly this many pixels (a video's frame) instead of the canvas's size on the page */
@@ -377,6 +426,8 @@ export class Puppet {
   physicsScale = 1
   hidden = new Set<string>()
   tuning: Tuning = defaultTuning()
+  /** the bangs layer's own depth (0: none), which the brows over them (alt) were weighted with: tuning.fringe scales it */
+  bangsDepth = 0
   rig: Rig = defaultRig()
   /** extra expression weights by layer param name (smile lives in params) */
   expr: Record<string, number> = {}
@@ -604,6 +655,7 @@ export class Puppet {
     // the brows layers lie over the bangs where the build put them there: they follow what is under them
     const fi = model.layers.findIndex((L) => L.group === 'hair_front')
     const bangs = fi >= 0 ? { img: imgs[fi].main, def: model.layers[fi] } : undefined
+    this.bangsDepth = bangs?.def.depth ?? 0
     model.layers.forEach((L, i) => built.push(this.buildLayer(L, imgs[i].main, imgs[i].frames, imgs[i].mask, imgs[i].talk, imgs[i].brows,
       L.id === 'brows' || L.role === 'expr_brows' || L.brow_tex ? bangs : undefined)))
     this.layers = built
@@ -642,7 +694,8 @@ export class Puppet {
       body: { ...defaultRig().body, ...(model.rig?.body || {}), bust: 0 } }
     this.expr = {}
     this.resetMouth(); this.talkLeft = 0
-    this.cutBottom = model.anchors.bottom_y >= model.canvas[1] - 4
+    this.fb = model.anchors.body ? fullBody(model.anchors, model.canvas) : null
+    this.cutBottom = !this.fb && model.anchors.bottom_y >= model.canvas[1] - 4
     // all that carries over from frame to frame starts again: nothing of the model before moves this one (and a NaN
     // in the torso's smoothing once stayed there for good, whatever was loaded next)
     this.resetPhysics()
@@ -758,8 +811,7 @@ export class Puppet {
     const browLayer = this.model.layers.some((l) => l.id === 'brows')
     // every layer's vertices sit on ONE global lattice, so the piecewise-linear deformation is identical
     // for overlapping layers: patches (eyes, mouth, expressions) can never drift off the face at big angles
-    const [MW, MH] = this.model.canvas
-    const cell = latticeCell(MW, MH)
+    const cell = latticeOf(this.model)
     const gx0 = Math.floor(L.x / cell), gy0 = Math.floor(L.y / cell)
     const cols = Math.ceil((L.x + L.w) / cell) - gx0, rows = Math.ceil((L.y + L.h) / cell) - gy0
     const occ = alphaGrid([img, ...frames], cols, rows, (L.x - gx0 * cell) / cell, (L.y - gy0 * cell) / cell, L.w / cell, L.h / cell)
@@ -801,7 +853,8 @@ export class Puppet {
     const h = A.head
     // long hair only starts to swing below the jaw: anything at head height (hats, side locks) stays rigid
     const hairTop = A.neck_y - 0.1 * h.ry
-    const hairLen = Math.max(1, A.bottom_y - hairTop)
+    // ... and swings fully at its own tips: on a full-body model the drawing's bottom is the feet, far below them
+    const hairLen = Math.max(1, (A.body && A.hair_bottom_y != null ? A.hair_bottom_y : A.bottom_y) - hairTop)
     for (let i = 0; i < n; i++) {
       const x = rest[2 * i], y = rest[2 * i + 1]
       const rr = Math.hypot((x - h.cx) / h.rx, (y - h.cy) / h.ry)
@@ -1011,7 +1064,8 @@ export class Puppet {
       const b: [number, number] = [0, 0]
       this.bodyOffset(rx, ry, P, b)
       o[0] = rx + b[0]; o[1] = ry + b[1]
-      o[2] = (this.body.roll * Math.PI) / 180 * smooth(A.bottom_y, A.neck_y, ry)
+      // the torso's lean there, as bodyOffset turns it (a full-body model: the waist's and the ankles' turns)
+      o[2] = this.fb ? this.fbTurn(ry) : (this.body.roll * Math.PI) / 180 * smooth(A.bottom_y, A.neck_y, ry)
     } else {
       const h: [number, number] = [0, 0]
       this.headXform(rx, ry, def.depth ?? 0, P, h)
@@ -1157,8 +1211,10 @@ export class Puppet {
     out[0] = X; out[1] = Y
   }
 
-  /** rigid torso motion at (x, y): breathing, turn-follow, lean; plus the chest bump when `bust` */
+  /** rigid torso motion at (x, y): breathing, turn-follow, lean; plus the chest bump when `bust`. A full-body model
+   *  (anchors.body) moves by fullBodyOffset instead */
   private bodyOffset(x: number, y: number, P: Params, out: [number, number], bust = true) {
+    if (this.fb) { this.fullBodyOffset(x, y, P, out, bust); return }
     const A = this.model.anchors, h = A.head, B = this.rig.body
     const t = smooth(A.bottom_y, A.neck_y, y) // 0 at the bottom edge, 1 at the neck
     const fw = A.face[2] - A.face[0]
@@ -1190,6 +1246,143 @@ export class Puppet {
     out[0] = dx; out[1] = dy
   }
 
+  /** the upper body's own motion at (x, y) on a full-body model, `t` of the way from the hips (0) to the neck (1):
+   *  breathing and the turn-follow slide as bodyOffset has them (the slide FB_GAIN of it), and the waist's turn about
+   *  the hips' midpoint by its weight `w` there (0 below the waist band, 1 above it: the upper body turns as one piece
+   *  and stays straight) */
+  private upperOffset(x: number, y: number, t: number, w: number, P: Params, out: [number, number], bust: boolean, v = this.fbPose()) {
+    const A = this.model.anchors, h = A.head, B = this.rig.body, fb = this.fb!
+    const br = P.breath * this.tuning.breath * this.rig.breath * B.breath
+    let dx = (x - h.cx) * 0.01 * br * t
+    let dy = -br * 0.024 * h.ry * Math.pow(t, 1.3)
+    const yaw = (this.body.yaw / 30) * FB_GAIN
+    const bw = 1.4 * fb.fw
+    const u = Math.max(-1.6, Math.min(1.6, (x - h.cx) / bw))
+    dx += yaw * bw * 0.16 * Math.pow(t, 1.2) * (1 - 0.18 * u * u) + yaw * (x - h.cx) * -0.04 * Math.sign(u) * t
+    if (v.aw !== 0 && w > 0) {
+      const rx = x - fb.hx, ry = y - fb.hy
+      dx += (rx * (v.cw - 1) - ry * v.sw) * w; dy += (rx * v.sw + ry * (v.cw - 1)) * w
+    }
+    const C = A.chest
+    if (C && bust) {
+      const ux = (x - C.cx) / C.rx, uy = (y - C.cy) / C.ry, d = Math.sqrt(ux * ux + uy * uy)
+      const wc = 1 - smooth(0.2, 1.15, d)
+      if (wc > 0) {
+        dy -= br * 0.012 * h.ry * wc * (0.4 + B.bust)
+        dx += this.bust.x * wc; dy += this.bust.y * wc
+      }
+    }
+    out[0] = dx; out[1] = dy
+  }
+
+  /** a full-body model's weight of the waist's turn (and the talking dip) at height y: 0 below the waist band, 1 above */
+  private fbWaist(y: number) {
+    const fb = this.fb!
+    return smooth(fb.hy + FB_WAIST * fb.fw, fb.hy - FB_WAIST * fb.fw, y)
+  }
+
+  /** ... and of the sway from the ankles: 0 at the ankles and below (the feet stay), 1 above the ankle band */
+  private fbAnkle(y: number) {
+    const fb = this.fb!
+    return smooth(fb.ankleY - FB_ANKLE_BAND[0] * fb.fw, fb.ankleY - FB_ANKLE_BAND[1] * fb.fw, y)
+  }
+
+  /** how far a full-body model's body is turned at height y (rad): the waist's turn and the ankles' by their weights */
+  private fbTurn(y: number) {
+    const v = this.fbPose()
+    return v.aw * this.fbWaist(y) + v.aa * this.fbAnkle(y)
+  }
+
+  /** a full-body model's pose (model px, rad), worked out again only when what it is made of changed: the lean
+   *  (body.roll, FB_GAIN of it) split into the waist's turn (1 - FB_ANKLE, less the shoulders' answer to the hips'
+   *  tilt) and the ankles' (FB_ANKLE), the webcam's sideways move added to the ankles' as the angle that moves the neck
+   *  by move.x frame widths (at most about FB_CAM_SWAY), the hips' shift, the crouch and the dip */
+  private fbPose() {
+    const v = this.pv, m = this.fbm
+    if (v.roll === this.body.roll && v.cr === this.crouch && v.dp === this.dip && v.mx === this.move.x && v.hs === m.hs
+      && v.tilt === m.tilt) return v
+    const fb = this.fb!, A = this.model.anchors
+    const lean = (this.body.roll * FB_GAIN * Math.PI) / 180, lim = (FB_CAM_SWAY * Math.PI) / 180
+    // a soft limit: a hard one stopped the sway dead at 3 degrees while the head still turned
+    const cam = lim * Math.tanh(Math.atan2(this.move.x * fb.uw, Math.max(1, fb.ankleY - A.neck_y)) / lim)
+    const aw = lean * (1 - FB_ANKLE) - FB_SHOULDER_ANSWER * m.tilt, aa = lean * FB_ANKLE + cam
+    v.roll = this.body.roll; v.cr = this.crouch; v.dp = this.dip; v.mx = this.move.x; v.hs = m.hs; v.tilt = m.tilt
+    v.aw = aw; v.cw = Math.cos(aw); v.sw = Math.sin(aw); v.aa = aa; v.ca = Math.cos(aa); v.sa = Math.sin(aa)
+    v.x = m.hs; v.y = -this.crouch * fb.uh; v.dip = -this.dip * fb.uh
+    return v
+  }
+
+  /** a full-body model's body motion at (x, y), the waist's part first, then the ankles':
+   *  - the upper body's own motion (upperOffset: breathing and the turn-follow from the hips up, the waist's turn as one
+   *    piece above the waist band);
+   *  - the legs take the hips' shift and the crouch by a weight going straight from 1 at the hips to 0 at the ankles, so
+   *    a leg stays a straight line and the feet stay; the talking dip moves only what is above the waist band;
+   *  - body layers: the hips' tilt and the hem (partsOffset);
+   *  - then everything above the ankle band turns about the ankles' midpoint (the legs lean as straight lines).
+   *  Arms go by height: a hand hanging beside the thigh moves with the thigh */
+  private fullBodyOffset(x: number, y: number, P: Params, out: [number, number], bust: boolean) {
+    const fb = this.fb!, A = this.model.anchors
+    const t = smooth(fb.hy, A.neck_y, y), w = this.fbWaist(y), v = this.fbPose()
+    this.upperOffset(x, y, t, w, P, out, bust, v)
+    if (v.x !== 0 || v.y !== 0) {
+      const wl = Math.min(1, Math.max(0, (fb.ankleY - y) / (fb.ankleY - fb.hy)))
+      out[0] += v.x * wl; out[1] += v.y * wl
+    }
+    if (v.dip !== 0) out[1] += v.dip * w
+    if (this.fbParts) this.partsOffset(x, y, out)
+    if (v.aa !== 0) {
+      const wa = this.fbAnkle(y)
+      if (wa > 0) {
+        // the turn's rise and fall (X sin) builds up from the ankle band's top to the hips: in one go within the band a
+        // wide stance had one shin stretched and the other pressed by up to 15 %
+        const X = x + out[0] - fb.ax, Y = y + out[1] - fb.ay, top = fb.ankleY - FB_ANKLE_BAND[1] * fb.fw
+        const wl = Math.min(1, Math.max(0, (top - y) / Math.max(1, top - fb.hy)))
+        out[0] += (X * (v.ca - 1) - Y * v.sa) * wa; out[1] += (X * v.sa * wl + Y * (v.ca - 1)) * wa
+      }
+    }
+  }
+
+  /** what a full-body model's body layers take on top: the hips' tilt (its own band at the hips, and down the legs) and
+   *  the hem (from a little above the hips, most at the hem line, gone a little below it), with a slow breath across
+   *  its width */
+  private partsOffset(x: number, y: number, out: [number, number]) {
+    const fb = this.fb!, m = this.fbm, B = this.model.anchors.body!, fw = fb.fw
+    if (m.tilt !== 0) {
+      const below = Math.min(1, Math.max(0, (fb.ankleY - y) / Math.max(1, fb.ankleY - fb.hy)))
+      const band = y < fb.hy ? smooth(fb.hy - 1.3 * fw, fb.hy - 0.2 * fw, y) : below
+      out[1] += m.tanTilt * (x - fb.hx) * band
+    }
+    const top = fb.hy - 0.4 * fw
+    if (B.hem_y != null && y > top) {
+      const hem = B.hem_y
+      const g = y <= hem ? Math.pow(Math.min(1, Math.max(0, (y - top) / Math.max(1, hem - top))), 1.6) : 1 - smooth(hem, hem + 0.45 * fw, y)
+      if (g > 0) {
+        const hx0 = B.hem_x ? (B.hem_x[0] + B.hem_x[1]) / 2 : fb.hx
+        out[0] += (m.hem + (x - hx0) * 0.012 * m.breath) * g
+      }
+    }
+  }
+
+  /** a full-body model's springs, one sub-step: the hips follow the upper body and shift their weight a little by
+   *  themselves, the hem hangs behind the hips and the sway. physicsScale scales all of it (0: they rest) */
+  private stepFb(dt: number) {
+    const fb = this.fb!, m = this.fbm, t = this.time, A = this.model.anchors, fw = fb.fw, k = this.physicsScale
+    const v = this.fbPose()
+    const slide = (this.body.yaw / 30) * FB_GAIN * 1.4 * fw * 0.16, leanMove = Math.sin(v.aw) * (fb.hy - A.neck_y)
+    const idle = FB_HIP_IDLE * fw * (Math.sin((t * 2 * Math.PI) / 8.6) * 0.75 + Math.sin((t * 2 * Math.PI) / 3.9 + 1.1) * 0.25)
+    const target = k * (FB_HIP_SLIDE * slide - FB_HIP_BACK * leanMove + this.fbIdle * idle)
+    m.hv += (-FB_HIP_K * (m.hs - target) - FB_HIP_C * m.hv) * dt
+    m.hs += m.hv * dt
+    m.tilt = -FB_HIP_TILT * Math.max(-1.2, Math.min(1.2, m.hs / (FB_HIP_REACH * fw)))
+    m.tanTilt = Math.tan(m.tilt)
+    if (this.model.anchors.body!.hem_y == null) return
+    m.breath = Math.sin(t * 1.7) * k  // the hem's slow breath across its width (partsOffset)
+    const push = -k * FB_HEM_LAG * (m.hs + (fb.ankleY - fb.hy) * Math.sin(v.aa) * 0.6)
+    const wind = k * FB_HEM_WIND * fw * (Math.sin(t * 1.3) + 0.5 * Math.sin(t * 2.9 + 0.6))
+    m.hemV += (-FB_HEM_K * (m.hem - push - wind) - FB_HEM_C * m.hemV) * dt
+    m.hem = Math.max(-FB_HEM_MAX * fw, Math.min(FB_HEM_MAX * fw, m.hem + m.hemV * dt))
+  }
+
   /** torso lags the head; the chest spring lags the torso (only when the rig asks for it) */
   private stepBody(dt: number) {
     const P = this.params, B = this.rig.body
@@ -1212,6 +1405,20 @@ export class Puppet {
     this.bust.x += this.bust.vx * dt; this.bust.y += this.bust.vy * dt
     const lim = 0.035 * this.model.anchors.head.ry * (0.5 + s)
     this.bust.x = Math.max(-lim, Math.min(lim, this.bust.x)); this.bust.y = Math.max(-lim, Math.min(lim, this.bust.y))
+  }
+
+  /** automatic movement (the player's drivers and actions): the webcam's sideways move `x` and distance `s`, a talking bob `talkHop`
+   *  (<= 0), an action's move `actY` (a hop: a crouch, then a flight) and the webcam's lean `camY`, as shares of the view
+   *  (y up). A half-body model moves the picture by their sum, as `move` always has. A full-body model (anchors.body)
+   *  keeps its feet on the ground line: the sideways move sways it from the ankles (fbPose; render() does not slide
+   *  it), a hop's crouch and the webcam's lean down (at most CROUCH_CAM) crouch it, the talking bob dips only the upper
+   *  body, only an action's flight lifts the whole figure, and a lean up is not followed (it would float) */
+  setMove(x: number, s: number, talkHop: number, actY: number, camY: number) {
+    this.move.x = x; this.move.s = s
+    if (!this.fb) { this.move.y = talkHop + actY + camY; this.crouch = 0; this.dip = 0; return }
+    this.move.y = Math.max(0, actY)
+    this.crouch = Math.min(0, actY) + Math.max(-CROUCH_CAM, Math.min(0, camY))
+    this.dip = Math.min(0, talkHop)
   }
 
   /** closed mouth, no hold pending (a new model, a test starting a clip) */
@@ -1309,13 +1516,18 @@ export class Puppet {
     // inputs never leave their range (webcam yaw can overshoot); the rig maps the range to a modest turn
     for (const k of ['angleX', 'angleY', 'angleZ'] as const) P[k] = Math.max(PARAM_RANGES[k][0], Math.min(PARAM_RANGES[k][1], P[k]))
     const steps = Math.max(1, Math.ceil(dt / (1 / 120))) // sub-step physics for stability
-    for (let i = 0; i < steps; i++) { this.stepBody(dt / steps); this.stepPhysics(dt / steps); this.stepChains(dt / steps) }
+    this.fbParts = false
+    for (let i = 0; i < steps; i++) {
+      this.stepBody(dt / steps); this.stepPhysics(dt / steps); this.stepChains(dt / steps)
+      if (this.fb) this.stepFb(dt / steps)
+    }
     if (mesh) this.deform()
   }
 
   /** every layer's vertices at the current params, springs and torso: into each layer's out */
   private deform() {
     const P = this.params, A = this.model.anchors
+    this.fbParts = false
     const neckBody: [number, number] = [0, 0]
     this.bodyOffset(A.head.cx, A.neck_y, P, neckBody)
     const hp: [number, number] = [0, 0], bp: [number, number] = [0, 0]
@@ -1381,11 +1593,15 @@ export class Puppet {
       this.headXform(A.head.cx, cy, 0, P, hp); this.bodyOffset(A.head.cx, cy, P, bp)
       chinDx = hp[0] + neckBody[0] - (A.head.cx + bp[0])
     }
+    // tuning.fringe: the bangs' depth, and the brows over them that move as the bangs do (alt), scaled where read
+    const fringeB = fringeScale(this.bangsDepth, this.tuning.fringe)
     for (const L of this.layers) {
+      this.fbParts = !!this.fb && L.def.group === 'body'
       // a layer not drawn this frame (an expression that is off, closed lashes on an open eye) is not moved either;
       // measuring keyforms needs every layer where the rig puts it
       if (!this.kfOff && !this.shown(L)) continue
       const d = L.def, r = L.rest, o = L.out
+      const fringeL = d.group === 'hair_front' ? fringeScale(d.depth, this.tuning.fringe) : 1
       L.uploaded = false
       const n = r.length / 2
       const role = d.role || ''
@@ -1435,7 +1651,7 @@ export class Puppet {
         if (d.rigid) {
           const vx = x - d.rigid[0], vy = y - d.rigid[1]
           pt[0] = rgx + vx * rc - vy * rs; pt[1] = rgy + vx * rs + vy * rc
-        } else place(x, y, L.wHead[i], L.dep[i], L.wPhys1[i], L.wPhys2[i], L.wFront[i])
+        } else place(x, y, L.wHead[i], fringeL === 1 ? L.dep[i] : L.dep[i] * fringeL, L.wPhys1[i], L.wPhys2[i], L.wFront[i])
         if (L.skin) { this.skinOffset(L.skin, i, so); pt[0] += so[0]; pt[1] += so[1] }
         let X = pt[0], Y = pt[1]
         if (L.wTwist && L.wTwist[i] > 0) X += chinDx * L.wTwist[i]
@@ -1448,7 +1664,7 @@ export class Puppet {
         if (c > 0 || cB > 0) {  // over the bangs: as the front hair moves at this point, lifted brow and all
           const k = 5 * i, al = L.alt!
           const X0 = X, Y0 = Y
-          place(x, y, al[k + 1], al[k], al[k + 2], al[k + 3], al[k + 4])
+          place(x, y, al[k + 1], fringeB === 1 ? al[k] : al[k] * fringeB, al[k + 2], al[k + 3], al[k + 4])
           if (L.altSkin) { this.skinOffset(L.altSkin, i, so); pt[0] += so[0]; pt[1] += so[1] }
           X += (pt[0] - X0) * c; Y += (pt[1] - Y0) * c
           if (L.outB) { L.outB[2 * i] = X0 + (pt[0] - X0) * cB; L.outB[2 * i + 1] = Y0 + (pt[1] - Y0) * cB }
@@ -1562,12 +1778,16 @@ export class Puppet {
     gl.activeTexture(gl.TEXTURE0); gl.uniform1i(this.uTex, 0)
     gl.uniform1i(this.uMode, 0)
     const [MW, MH] = this.model.canvas
-    const V = this.view, M = this.move, hd = this.model.anchors.head
+    const V = this.view, M = this.move, A = this.model.anchors, hd = A.head
+    // what the camera fits (model px): the canvas, or on a full-body model its head-chest frame (a close-up's size too),
+    // the whole figure or down to the knees (fit). cx2 / cy2: twice its centre
+    const F = A.frame ? fitBox(this.focusHead ? 'frame' : this.fit, A, this.model.canvas, this.fb) : null
+    const BW = F ? F[2] - F[0] : MW, BH = F ? F[3] - F[1] : MH, cx2 = F ? F[0] + F[2] : MW, cy2 = F ? F[1] + F[3] : MH
     // vertical offset for scale k (the y of uView; larger moves the picture down) and the clip-space y of the drawing's
     // bottom edge under it
-    const offY = (k: number, y: number) => (this.focusHead ? -(hd.cy + hd.ry * 0.15) * (2 * k) / h : -MH * k / h) + this.panY - 2 * y
+    const offY = (k: number, y: number) => (this.focusHead ? -(hd.cy + hd.ry * 0.15) * (2 * k) / h : -cy2 * k / h) + this.panY - 2 * y
     const bottom = (k: number, oy: number) => -(MH * (2 * k) / h + oy)
-    const base = Math.min(w / MW, h / MH) * this.zoom
+    const base = Math.min(w / BW, h / BH) * this.zoom
     const s = base * V.s * M.s
     const sx = (2 * s) / w, sy = (2 * s) / h
     let oy = offY(s, V.y + M.y)
@@ -1575,7 +1795,11 @@ export class Puppet {
       const allowed = Math.max(bottom(base * V.s, offY(base * V.s, V.y)), -1)
       oy += Math.max(0, bottom(s, oy) - allowed)
     }
-    const ox = (this.focusHead ? -hd.cx * sx : -MW * s / w) + 2 * (V.x + M.x)
+    // the whole figure scales with the webcam's distance about the ground line, where it stands (other shots about
+    // their centre, as a half-body picture)
+    if (this.fb && !F && !this.focusHead && M.s !== 1) oy += (MH - 2 * this.fb.groundY) * (s - base * V.s) / h
+    // a full-body model takes the sideways move as a sway from the ankles (fbPose): sliding it would slide the feet
+    const ox = (this.focusHead ? -hd.cx * sx : -cx2 * s / w) + 2 * (V.x + (this.fb ? 0 : M.x))
     gl.uniform4f(this.uView, sx, sy, ox, oy)
     this.drawMasks(w, h, sx, sy, ox, oy)
     clear()
@@ -1770,6 +1994,8 @@ export class Puppet {
     this.drive.started = false
     this.body = { yaw: 0, roll: 0 }
     this.bust = { x: 0, y: 0, vx: 0, vy: 0, px: 0, py: 0 }
+    this.fbm = { hs: 0, hv: 0, tilt: 0, tanTilt: 0, hem: 0, hemV: 0, breath: 0 }
+    this.crouch = 0; this.dip = 0; this.pv.roll = NaN
   }
 
   snapshot(): string { return this.canvas.toDataURL('image/png') }
