@@ -16,7 +16,7 @@ fs.rmSync(dir, { recursive: true, force: true })
 fs.mkdirSync(path.join(dir, 'node_modules', path.dirname(name)), { recursive: true })
 fs.symlinkSync(root, path.join(dir, 'node_modules', name), 'dir')
 fs.writeFileSync(path.join(dir, 'use.ts'), `
-import { LivLivError, Player, VERSION, type ActionId, type Driver, type LivLivErrorCode, type LoadOptions, type LoadProgress, type ModelInfo, type PlaybackPose, type View } from '${name}'
+import { LivLivError, Player, VERSION, type ActionId, type Driver, type Fit, type Frame, type LivLivErrorCode, type LoadOptions, type LoadProgress, type ModelInfo, type PlaybackPose, type View } from '${name}'
 import { preloadFaceModel, startFaceTracking, TrackingFilter, parameterRule, readTrackingProfile, TRACKING_PARAMETERS, type TrackingParameter, type TrackingProfile, type ParameterRule, type FaceTracking } from '${name}/tracking'
 import { createSpeech, startLipSync, type ClipHooks, type LipSync } from '${name}/voice'
 import { BODY_LIMIT, BodyPlayer, LivLivError as FromBody, type Body } from '${name}/body'
@@ -54,6 +54,14 @@ player.use(driver)
 const hooks: ClipHooks = { onEnd() {}, onFail() {} }
 createSpeech(player).say(new Response(new Blob()), hooks)
 const pose: PlaybackPose = { ...player.getPose(), crouch: -0.02, dip: 0, talk: 0 }
+const shot: Fit = 'knee'
+player.view.fit = shot
+const old: PlaybackPose = { params: pose.params, move: pose.move, expr: {}, view: { x: 0, y: 0, zoom: 1, head: false } }
+// @ts-expect-error a shot is one of three
+player.view.fit = 'feet'
+const tall: boolean = player.model!.fullBody
+player.use({ update(f: Frame) { f.talk += f.grounded ? -0.01 : 0 } })
+void [old, tall]
 player.renderPose(pose, 1 / 30, [640, 960])
 void [VERSION, model, view, tracking, sync, preloadFaceModel(), createSpeech(player), BODY_LIMIT, bodyPlayer, new VrmBody()]
 // the expressions getter keeps the model's label fields on both players (issue #8): label is a string, labels a map

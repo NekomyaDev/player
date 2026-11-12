@@ -16,10 +16,10 @@ export type { Labels, ModelDef, ModelMeta, Params }
 export { modelFiles } from './files'
 export { LivLivError }
 export type { ParameterProfile, ParameterSample, ParameterRule } from './profile'
-export type { ActionId, Driver, Frame, Host, LivLivErrorCode, LoadOptions, LoadProgress, PlaybackPose, PlayerOptions, View } from './base'
+export type { ActionId, Driver, Fit, Frame, Host, LivLivErrorCode, LoadOptions, LoadProgress, PlaybackPose, PlayerOptions, View } from './base'
 
 /** this package's version */
-export const VERSION = '0.4.0'
+export const VERSION = '0.5.0'
 
 /** where a model comes from: the URL of its model.json, of the folder holding it, or of a .livliv package (relative URLs
  *  resolve against the page); a .livliv package itself (a File or Blob: a ZIP of the folder); or its files: a FileList /
@@ -34,6 +34,8 @@ export interface ModelInfo {
   version: number
   /** the size the character was drawn at, in pixels */
   size: [number, number]
+  /** a full-body character: drawn standing on a ground line, its feet kept there, framed by `view.fit` */
+  fullBody: boolean
   /** what setExpression() takes: `id` (smile, shy, angry ... mean the same on every model; x_… is the model's own),
    *  `label` its name in the player's language, `labels` every language's (BCP 47 tag -> name) */
   expressions: { id: string; label: string; labels: Labels }[]
@@ -135,7 +137,7 @@ export class Player extends PlayerBase<ModelInfo> {
     const m = p.model
     const ex = m.expressions || (m.layers.some((l) => l.id === 'expr_smile') ? [{ id: 'smile', label: '', labels: SMILE }] : [])
     this.info = {
-      name: m.name, format: m.format || LEGACY_FORMAT, version: m.version ?? 3, size: m.canvas,
+      name: m.name, format: m.format || LEGACY_FORMAT, version: m.version ?? 3, size: m.canvas, fullBody: p.grounded,
       // a legacy package names each expression once, in the language its owner wrote it in
       expressions: ex.map(({ id, label, labels }) => {
         const all = labels || { [langOf(label)]: label }
@@ -155,11 +157,27 @@ export class Player extends PlayerBase<ModelInfo> {
   getAnchor(name: AnchorName): AttachmentAnchor | null { return this.info && !this.disposed ? this.puppet.anchor(name) : null }
 
   /** @internal */
+  protected get grounded() { return this.puppet.grounded }
+
+  /** a full-body character keeps its feet on the ground: the sideways move sways it from the ankles, a hop's crouch and
+   *  a lean toward the camera crouch it, the talking bob dips its upper body, and only a hop's flight lifts it
+   *  @internal */
+  protected place(actY: number) {
+    const p = this.puppet, f = this.frame
+    if (!p.grounded) { super.place(actY); return }
+    p.setMove(f.move.x, f.move.s, f.talk, actY, f.move.y)
+    f.move.y = p.move.y
+    this.ground = { crouch: p.crouch, dip: p.dip, talk: f.talk }
+  }
+
+  /** @internal */
   protected show(dt: number) {
-    const p = this.puppet, f = this.frame, V = this.view
+    const p = this.puppet, f = this.frame, V = this.view, G = this.ground
     p.view = { x: V.x, y: V.y, s: V.zoom }
     p.focusHead = V.head
+    p.fit = V.fit === 'whole' || V.fit === 'knee' ? V.fit : 'frame'
     p.move = { ...f.move }
+    p.crouch = G.crouch; p.dip = G.dip
     p.size = this.renderSize
     p.update(dt)
     p.render()

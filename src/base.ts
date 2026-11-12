@@ -36,25 +36,33 @@ export interface PlayerOptions {
   lang?: string
 }
 
+/** what the canvas shows of a full-body character: 'frame' its head and chest, as a half-body character fills the
+ *  canvas; 'whole' the whole figure; 'knee' from the head down to a little below the knees */
+export type Fit = 'frame' | 'whole' | 'knee'
+
 /** where the character sits in the canvas: x, y move it by shares of the canvas (y up), zoom scales it about the
- *  center; head: frame the head instead of the whole drawing (avatars, chat bubbles; a BodyPlayer does not use it) */
-export interface View { x: number; y: number; zoom: number; head: boolean }
+ *  center; head: frame the head instead of the whole drawing (avatars, chat bubbles; a BodyPlayer does not use it);
+ *  fit: a full-body character's shot ('frame' when missing). A half-body character fills the canvas whatever it says,
+ *  and a BodyPlayer does not use it */
+export interface View { x: number; y: number; zoom: number; head: boolean; fit?: Fit }
 
 /** A complete displayed pose, independent of the character format. Safe to keep for a recording or send to another
  *  player. The move includes actions; the view is applied separately. */
 export interface PlaybackPose {
   /** the final params, in the ranges of PARAM_RANGES */
   params: Params
-  /** the picture's move: x, y shares of the canvas (y up), s a scale. Actions, the talking bob and drivers included */
+  /** the picture's move: x, y shares of the canvas (y up), s a scale. Actions, the talking bob and drivers included.
+   *  On a full-body character, see crouch */
   move: { x: number; y: number; s: number }
   /** each expression's weight as shown, 0..1 */
   expr: Record<string, number>
   /** the player's view (see View) */
   view: View
-  /** Reserved for full-body characters, which a later version plays. Never set for a half-body character, and ignored
-   *  by this version. A full-body character keeps its feet on the ground: there `move.y` is only an action's lift,
-   *  `crouch` how far the hips go down (a hop's crouch, a lean toward the camera) and `dip` how far the upper body
-   *  dips on a syllable, as shares of the frame's height (<= 0), and `talk` the talking bob, apart from `move` */
+  /** Full-body characters only (never set for a half-body one, which ignores them). A full-body character keeps its
+   *  feet on the ground: `move.x` sways it from the ankles instead of sliding it, `move.y` is only an action's lift
+   *  (>= 0), `crouch` how far the hips go down (a hop's crouch, a lean toward the camera) and `dip` how far the upper
+   *  body dips on a syllable, as shares of the frame's height (<= 0). `talk` is the talking bob the dip came from (a
+   *  share of the canvas, <= 0): renderPose() draws the dip, not it */
   crouch?: number
   /** see crouch */
   dip?: number
@@ -73,8 +81,14 @@ export interface Frame {
   tracked: boolean
   /** add to params, kept in their ranges */
   add(offsets: Partial<Params>): void
-  /** move the picture: x, y shares of the canvas (y up), s a scale */
+  /** move the picture: x, y shares of the canvas (y up), s a scale. A full-body character keeps its feet on the ground:
+   *  x sways it from the ankles, and a move down crouches it (a little at most) instead of sinking it */
   readonly move: { x: number; y: number; s: number }
+  /** a talking bob (a share of the canvas, <= 0), apart from move: a full-body character dips its upper body on it
+   *  instead of sinking whole. Lip sync writes it */
+  talk: number
+  /** the character stands on a ground line (a full-body character): the player keeps its feet there */
+  readonly grounded: boolean
 }
 
 /** something that moves the character each frame: face tracking and lip sync are drivers, and your own code can be */
@@ -157,6 +171,7 @@ function inRange(P: Params) {
   }
 }
 const finite = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
+const FITS: readonly Fit[] = ['frame', 'whole', 'knee']
 
 export abstract class PlayerBase<Info extends { expressions: { id: string }[] }> implements Host {
   readonly canvas: HTMLCanvasElement
@@ -168,7 +183,7 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
   followPointer: 'page' | 'canvas' | false
   /** see PlayerOptions.renderWhenHidden */
   renderWhenHidden: boolean
-  readonly view: View = { x: 0, y: 0, zoom: 1, head: false }
+  readonly view: View = { x: 0, y: 0, zoom: 1, head: false, fit: 'frame' }
   /** see PlayerOptions.lang */
   readonly lang: string
   /** Called when the canvas's WebGL context is lost (a phone reclaiming the page's GPU memory, a driver reset, too many
@@ -208,7 +223,10 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
   /** the canvas's own background while a poster is showing */
   private posterOver: Record<string, string> | null = null
   /** @internal */
-  protected frame: Frame & { move: { x: number; y: number; s: number } }
+  protected frame: Frame & { move: { x: number; y: number; s: number }; grounded: boolean }
+  /** a full-body character's crouch and dip this frame, and the talking bob they came from (see PlaybackPose)
+   *  @internal */
+  protected ground = { crouch: 0, dip: 0, talk: 0 }
 
   /** pose: the Params the subclass draws from, written to each frame */
   constructor(canvas: HTMLCanvasElement, pose: Params, options: PlayerOptions) {
@@ -219,7 +237,7 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
     this.lang = options.lang || uiLang()
     this.renderWhenHidden = options.renderWhenHidden ?? false
     this.frame = {
-      params: pose, dt: 0, time: 0, tracked: false, move: { x: 0, y: 0, s: 1 },
+      params: pose, dt: 0, time: 0, tracked: false, move: { x: 0, y: 0, s: 1 }, talk: 0, grounded: false,
       add(o) {
         for (const [k, v] of Object.entries(o) as [keyof Params, number | undefined][]) {
           if (v) pose[k] = clamp(pose[k] + v, PARAM_RANGES[k][0], PARAM_RANGES[k][1])
@@ -254,6 +272,18 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
   /** frees what it drew with
    *  @internal */
   protected abstract free(): void
+  /** the character stands on a ground line (a full-body character)
+   *  @internal */
+  protected get grounded(): boolean { return false }
+
+  /** this frame's move from the drivers' (frame.move), their talking bob (frame.talk) and an action's (actY): added up,
+   *  as a half-body character moves. A full-body character's player turns them into a sway, a crouch and a dip
+   *  @internal */
+  protected place(actY: number) {
+    const f = this.frame
+    f.move.y = f.move.y + f.talk + actY
+    this.ground.crouch = 0; this.ground.dip = 0; this.ground.talk = 0
+  }
 
   /** the context this draws with, where it has one and has started it
    *  @internal */
@@ -328,7 +358,10 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
 
   /** a new character starts on a neutral face
    *  @internal */
-  protected neutral() { this.expr = {}; this.smile = 0; this.replaying = false; this.parameterFilter.reset() }
+  protected neutral() {
+    this.expr = {}; this.smile = 0; this.replaying = false; this.parameterFilter.reset()
+    this.ground = { crouch: 0, dip: 0, talk: 0 }
+  }
 
   /** Shared motion response for idle, pointer, tracking and speech. Setting it does not restart drivers. */
   get parameterProfile(): ParameterProfile { return this.parameterFilter.profile }
@@ -404,7 +437,9 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
 
   /** The final pose of the last frame, copied so a recording cannot change the player. */
   getPose(): PlaybackPose {
-    return { params: { ...this.frame.params }, move: { ...this.frame.move }, expr: { ...this.shownExpr }, view: { ...this.view } }
+    const pose: PlaybackPose = { params: { ...this.frame.params }, move: { ...this.frame.move }, expr: { ...this.shownExpr }, view: { ...this.view } }
+    if (this.grounded) Object.assign(pose, this.ground)
+    return pose
   }
 
   /** Draws a recorded pose without running idle motion, drivers or actions again. Pause first. `dt` advances hair and
@@ -417,12 +452,15 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
     }
     if (!this.drawable || this.disposed || this.contextLost) return
     // a pose from elsewhere (a file, another page) is kept in range like a live one: a NaN would stay in the springs.
-    // crouch, dip and talk are a full-body character's, which load() refuses here: a half-body one draws without them
+    // crouch, dip and talk are a full-body character's: a half-body one draws without them
     const f = this.frame, V = this.view, M = pose.move, W = pose.view
     Object.assign(f.params, pose.params)
     inRange(f.params)
     Object.assign(f.move, { x: finite(M?.x, 0), y: finite(M?.y, 0), s: finite(M?.s, 1) })
-    Object.assign(V, { x: finite(W?.x, V.x), y: finite(W?.y, V.y), zoom: finite(W?.zoom, V.zoom), head: typeof W?.head === 'boolean' ? W.head : V.head })
+    const g = this.grounded
+    this.ground = { crouch: g ? clamp(finite(pose.crouch, 0), -1, 0) : 0, dip: g ? clamp(finite(pose.dip, 0), -1, 0) : 0, talk: g ? clamp(finite(pose.talk, 0), -1, 0) : 0 }
+    Object.assign(V, { x: finite(W?.x, V.x), y: finite(W?.y, V.y), zoom: finite(W?.zoom, V.zoom), head: typeof W?.head === 'boolean' ? W.head : V.head,
+      fit: FITS.includes(W?.fit as Fit) ? W!.fit : V.fit })
     const expr = this.shownExpr
     for (const key of Object.keys(expr)) delete expr[key]
     for (const [key, w] of Object.entries(pose.expr ?? {})) expr[key] = clamp(finite(w, 0), 0, 1)
@@ -470,10 +508,11 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
       this.idler.apply(P, t, dt, { busy: A.busy || this.was.mouth > 0.05, tracked: this.was.tracked,
         faceFree: !this.smile && !Object.values(E).some((v) => v > 0.02) })
     }
-    Object.assign(f, { dt, time: t, tracked: false })
+    Object.assign(f, { dt, time: t, tracked: false, talk: 0, grounded: this.grounded })
     Object.assign(f.move, { x: 0, y: 0, s: 1 })
     for (const d of this.drivers) d.update(f, this)
     this.was = { tracked: f.tracked, mouth: P.mouthOpen }
+    A.grounded = f.grounded
     f.add(A.update(dt))
     if (this.smile) P.smile = Math.max(P.smile, this.smile)
     if (A.awayW) for (const [k, v] of Object.entries(A.awayPose(t)) as [keyof Params, number][]) P[k] += (v - P[k]) * A.awayW
@@ -482,7 +521,7 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
     // expressions ease in and out (one no longer shown eases back to 0); dozing hides them, each is a face with open eyes
     for (const k of Object.keys(this.expr)) if (!(k in E)) E[k] = 0
     for (const k of Object.keys(E)) E[k] += ((this.expr[k] ?? 0) * (1 - A.awayW) - E[k]) * Math.min(1, dt * 8)
-    f.move.y += A.y
+    this.place(A.y)
     this.show(dt)
     this.onFrame?.(this.getPose())
     if (this.posterOver) this.setPoster()

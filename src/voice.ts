@@ -62,10 +62,10 @@ function mouth(read: () => number, vowel: () => number, o: LipSyncOptions): Driv
       P.vowel = vowel()
       const amount = o.motion ?? 1
       if (!f.tracked && amount > 0) {
-        talk.amount = amount; talk.bounce = !!o.bounce
+        talk.amount = amount; talk.bounce = !!o.bounce; talk.grounded = f.grounded
         f.add(talk.update(level, f.dt, P))
         if (talk.pauseBlink) player.blink()
-        f.move.y += talk.hop
+        f.talk += talk.hop
       } else if (talk.act || talk.hop) talk.reset()
     },
   }

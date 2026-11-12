@@ -561,6 +561,64 @@
     return out
   }
 
+  /** a full-body character, made from a featured one: its canvas twice as tall, the body layer stretched down to the
+   *  ground, hips, knees, ankles and a hem where a figure would have them, and the frame its old canvas. What is checked:
+   *  the three shots, the feet staying on the ground through a crouch, the talking dip, a recorded pose replayed */
+  window.runFullBody = async (id) => {
+    const m = bare(await json(id)), [W, H] = m.canvas, A = m.anchors
+    const body = m.layers.reduce((a, L) => (L.group === 'body' && L.w * L.h > (a?.w ?? 0) * (a?.h ?? 0) ? L : a), null)
+    const tall = { ...m, canvas: [W, 2 * H], rig: { ...m.rig, lattice: Math.max(6, Math.round(Math.max(W, H) / 128)) },
+      layers: m.layers.map((L) => (L === body ? { ...L, h: Math.round(1.95 * H) - L.y } : L)),
+      anchors: { ...A, bottom_y: 1.95 * H, frame: [0, 0, W, H], hair_bottom_y: A.bottom_y,
+        body: { hip_l: [0.6 * W, 1.15 * H, 0.9], hip_r: [0.4 * W, 1.15 * H, 0.9], knee_l: [0.59 * W, 1.5 * H, 0.9], knee_r: [0.41 * W, 1.5 * H, 0.9],
+          ankle_l: [0.58 * W, 1.9 * H, 0.9], ankle_r: [0.42 * W, 1.9 * H, 0.9], ground_y: 1.95 * H, hem_y: 1.3 * H, hem_x: [0.3 * W, 0.7 * W] } } }
+    const p = new Player(canvas, { autoplay: false, followPointer: false, idle: false })
+    const out = {}
+    const half = await p.load(await filesOf(id, m))
+    out.half = { fullBody: half.fullBody, keys: Object.keys(p.getPose()).sort().join() }
+    const info = await p.load(await filesOf(id, tall))
+    out.fullBody = info.fullBody; out.size = info.size.join()
+    // the shots: the head drawn largest in the frame, smallest with the whole figure
+    out.shots = {}
+    for (const fit of ['frame', 'knee', 'whole']) {
+      p.view.fit = fit; p.resize()
+      out.shots[fit] = { head: p.getAnchor('head').scale, share: covered() }
+    }
+    // the feet: the lowest row drawn, with room below (zoom 0.8), at rest and in a crouch
+    p.view.fit = 'whole'; p.view.zoom = 0.8
+    const lowest = () => {
+      const d = pixels(), w = canvas.width
+      for (let y = canvas.height - 1; y >= 0; y--) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 128) return canvas.height - 1 - y
+      return -1
+    }
+    p.resize()
+    out.restFeet = lowest()
+    // a lean toward the camera, a talking bob and a move sideways, from a driver as face tracking and lip sync write them
+    let lean = -0.03, talk = -0.01, side = 0.05
+    p.use({ update(f) { f.move.y += lean; f.talk += talk; f.move.x += side } })
+    p.resize()
+    const pose = p.getPose()
+    out.pose = { crouch: pose.crouch, dip: pose.dip, talk: pose.talk, y: pose.move.y, x: pose.move.x, fit: pose.view.fit }
+    out.crouchFeet = lowest()
+    // replayed, the same frame; without its crouch and dip, another; sunk whole as a half-body character moves, the
+    // feet go down
+    const live = pixels()
+    p.renderPose(pose)
+    out.replayed = changed(live, pixels())
+    p.renderPose({ ...pose, crouch: 0, dip: 0 })
+    out.without = changed(live, pixels())
+    p.renderPose({ ...pose, move: { ...pose.move, y: pose.move.y + (pose.crouch ?? 0) }, crouch: 0, dip: 0 })
+    out.sunkFeet = lowest()
+    // a lean away is not followed (the figure would float), and a hop lands on its feet
+    lean = 0.05; talk = 0; side = 0
+    p.play(); p.pause(); p.resize()
+    out.leanAway = { y: p.getPose().move.y, crouch: p.getPose().crouch }
+    lean = 0
+    out.anchors = { head: !!p.getAnchor('head'), body: !!p.getAnchor('body') }
+    p.dispose()
+    return out
+  }
+
   /** hostile packages: each must be refused (or, for broken keyforms, played on the rig alone), the model before kept */
   window.runHostile = async (id, kfId) => {
     const player = new Player(canvas, { autoplay: false, followPointer: false })

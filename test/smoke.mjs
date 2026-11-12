@@ -214,6 +214,25 @@ try {
   if (!kfOk) failed++
   console.log(`${kfOk ? 'ok  ' : 'FAIL'} broken keyforms: ${hostile.keyforms.refused ?? `${hostile.keyforms.name} plays on the rig alone`}`)
 
+  // a full-body character (see runFullBody): the shots, the feet on the ground, the dip, a recorded pose replayed
+  {
+    const r = await page.evaluate((id) => window.runFullBody(id), ids[0])
+    const near = (a, b) => Math.abs(a - b) < 1e-9
+    const checks = {
+      'a half-body character is no full-body one': r.half.fullBody === false && r.half.keys === 'expr,move,params,view',
+      'read as one': r.fullBody === true && r.size.split(',')[1] > r.size.split(',')[0],
+      'the shots': r.shots.frame.head > r.shots.knee.head && r.shots.knee.head > r.shots.whole.head && Object.values(r.shots).every((x) => x.share > 0.02),
+      'the pose': near(r.pose.crouch, -0.03) && near(r.pose.dip, -0.01) && near(r.pose.talk, -0.01) && r.pose.y === 0 && near(r.pose.x, 0.05) && r.pose.fit === 'whole',
+      'the feet stay': r.restFeet > 2 && Math.abs(r.crouchFeet - r.restFeet) <= 1 && r.sunkFeet < r.restFeet - 3,
+      'replayed exactly': r.replayed === 0 && r.without > 0.001,
+      'a lean away is not followed': r.leanAway.y === 0 && r.leanAway.crouch === 0,
+      'anchors': r.anchors.head && r.anchors.body,
+    }
+    const wrong = Object.entries(checks).filter(([, ok]) => !ok).map(([k]) => k)
+    if (wrong.length) failed++
+    console.log(`${wrong.length ? 'FAIL' : 'ok  '} a full-body character${wrong.length ? `: ${wrong.join(', ')}: ${JSON.stringify(r)}` : `: head ${r.shots.frame.head.toFixed(2)} / ${r.shots.knee.head.toFixed(2)} / ${r.shots.whole.head.toFixed(2)} of the width by shot, feet ${r.restFeet} px up at rest, ${r.crouchFeet} crouched, ${r.sunkFeet} sunk whole`}`)
+  }
+
   // a model that breaks while it is built (see runKeep): the character before stays, to the pixel
   const has = (test) => ids.find((id) => test(JSON.parse(readFileSync(join(chars, id, 'model.json'), 'utf8')), id))
   const rigged = has((m) => m.rig?.chains?.length && m.files?.keyforms) ?? kfId
