@@ -9,7 +9,7 @@
  *  - invalid: a model, but something in it is wrong or damaged
  *  - too-large: over this player's limits, or the GPU's memory
  *  - newer-format: written for a newer player
- *  - missing-feature: needs something this page or player does not have
+ *  - missing-feature: needs something this page or player does not have (a full-body character, until a later version)
  *  - missing-file: a file it names is not among the files
  *  - context-lost: the canvas's WebGL context is gone (see `onContextLost`)
  *  - released: the canvas's context was given up by `dispose({ release: true })`: use a new canvas */

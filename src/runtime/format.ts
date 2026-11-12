@@ -65,6 +65,7 @@ export function readModel(raw: unknown, lang = uiLang()): ModelDef {
   if (m.format === undefined || m.format === LEGACY_FORMAT) {
     const v = (m.version as number | undefined) ?? LEGACY_VERSION
     if (v > LEGACY_VERSION) throw coded('not-a-model', `this model says format "${LEGACY_FORMAT}" version ${v}, which never existed`)
+    halfBody(m)
     check(m as unknown as ModelDef)
     read.add(m)
     return m as unknown as ModelDef
@@ -76,10 +77,21 @@ export function readModel(raw: unknown, lang = uiLang()): ModelDef {
   }
   const missing = ((m.requires as string[] | undefined) || []).filter((f) => !FEATURES.includes(f))
   if (missing.length) throw coded('missing-feature', `this model needs ${missing.join(', ')}, which this player does not have: update the player`)
+  halfBody(m)
   const out = lower(m as unknown as V4, lang)
   check(out)
   read.add(out)
   return out
+}
+
+/** A full-body character (livliv.ai's newer kind) has anchors.body: its hips, its ankles and the ground line its feet
+ *  stand on, in a tall canvas the player frames by anchors.frame. This player draws half-body characters: it would show
+ *  the whole canvas, the feet sliding with every move, on too coarse a mesh. A half-body model never has anchors.body */
+function halfBody(m: Record<string, unknown>) {
+  const body = (m.anchors as { body?: unknown } | null | undefined)?.body
+  if (body != null && typeof body === 'object') {
+    throw coded('missing-feature', 'this is a full-body character: full-body characters arrive in a later version of LivLiv Player')
+  }
 }
 
 /** what any model must be before it is drawn, whatever wrote it: sizes and counts in range (LIMITS), numbers finite,

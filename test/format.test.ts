@@ -49,6 +49,22 @@ test('refusals', () => {
   assert.throws(() => readModel({ ...example(), layers: [] }), /no layers/)
 })
 
+test('a full-body character waits for a later version; a half-body one is never taken for one', () => {
+  // as livliv.ai writes a full-body build: the body's points [x, y, confidence], its ground line, the frame it is drawn by
+  const body = { hip_l: [600, 1700, 0.9], hip_r: [900, 1700, 0.9], ankle_l: [620, 2900, 0.9], ankle_r: [880, 2900, 0.9], ground_y: 2990 }
+  const tall = example()
+  tall.canvas = [1536, 3072]; tall.anchors.body = body; tall.anchors.frame = [0, 0, 1536, 1536]
+  for (const m of [tall, { ...v3(), anchors: { ...v3().anchors, body } }]) {
+    assert.throws(() => readModel(m), (e: Error & { code?: string }) => e.code === 'missing-feature' && /full-body characters arrive in a later version/.test(e.message))
+  }
+  // a half-body build has no anchors.body (the featured characters, all half-body, are read in characters.test.ts)
+  const half = example()
+  assert.equal(half.anchors.body, undefined)
+  assert.doesNotThrow(() => readModel(half))
+  half.anchors.body = null
+  assert.doesNotThrow(() => readModel(half))
+})
+
 test('v4 lowered to the runtime\'s shape', () => {
   const src = example(), m = readModel(src, 'en')
   assert.notEqual(m, src)
