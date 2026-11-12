@@ -21,7 +21,7 @@ const RATE = 24000 // the voices' sample rate: the context runs at it (not on We
 type Piece = { at: number; from: number; n: number; src: AudioBufferSourceNode; over?: boolean } // context time, samples
 type Clip = { pieces: Piece[]; rate: number; x: Grow; env: Float32Array; vowel: Float32Array; envDone: number; vowelDone: number; complete?: boolean; hooks?: ClipHooks; started?: boolean }
 /** one queued sentence, as its caller hears about it: onStart when its first sound reaches the listener, then exactly
- *  one of onEnd (heard to the end) or onFail (no sound came, or stop() dropped it) */
+ *  one of onEnd (heard to the end) or onFail (no sound came, its download broke off, or stop() dropped it) */
 export type ClipHooks = { onStart?: () => void; onEnd?: () => void; onFail?: () => void }
 type AudioWindow = Window & { webkitAudioContext?: typeof AudioContext }
 type AudioNav = Navigator & { audioSession?: { type: string } }
@@ -49,8 +49,14 @@ export class SpeechPlayer {
   /** the sound can be heard: the audio context is running */
   get running() { return this.ctx?.state === 'running' }
 
-  /** Post-volume voice for calls or recording. Owned here; available after unlock(). */
-  get stream() { return this.capture?.stream ?? null }
+  /** Post-volume voice for calls or recording. Owned here; available after unlock(), made on first use (a page that
+   *  never asks for it runs no extra audio node) */
+  get stream() {
+    if (!this.capture && this.ctx && this.out) {
+      try { this.capture = this.ctx.createMediaStreamDestination(); this.out.connect(this.capture) } catch { /* not supported */ }
+    }
+    return this.capture?.stream ?? null
+  }
 
   /** 0 (silent, still playing on time: a muted preview) .. 1 */
   setVolume(v: number) { this.volume = v; if (this.out) this.out.gain.value = v }
@@ -66,7 +72,6 @@ export class SpeechPlayer {
       try { this.ctx = own ? new AC() : new AC({ sampleRate: RATE }) } catch { this.ctx = new AC() }
       try { const s = (navigator as AudioNav).audioSession; if (s) s.type = 'playback' } catch { /* not supported */ } // iOS: not muted by the silent switch
       this.out = this.ctx.createGain(); this.out.gain.value = this.volume; this.out.connect(this.ctx.destination)
-      this.capture = this.ctx.createMediaStreamDestination(); this.out.connect(this.capture)
       this.ctx.onstatechange = () => this.onState?.()
     }
     if (this.ctx.state !== 'running') {

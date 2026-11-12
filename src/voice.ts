@@ -9,6 +9,8 @@ import { SpeechPlayer, type ClipHooks } from './runtime/speech'
 import { TalkMotion } from './runtime/talk'
 import type { Driver, Host } from './base'
 
+export type { ClipHooks }
+
 export interface LipSyncOptions {
   /** how much the voice also moves the head, brows and eyes: 0 (off) .. 2, default 1. Not while a face is tracked */
   motion?: number
@@ -26,14 +28,17 @@ export interface LipSync {
 }
 
 export interface Speech {
-  /** queues a clip (a URL, or audio bytes); it plays right after the ones before it */
+  /** queues a clip (a URL, audio bytes, or a fetch Response, which starts playing before it has all come); it plays
+   *  right after the ones before it. hooks: told when it starts being heard, then once when it ends or fails */
   say(clip: string | Blob | ArrayBuffer | Response, hooks?: ClipHooks): void
-  /** playback volume, 0..1; muting leaves timing and lip sync intact */
+  /** playback volume, 0..1 (default 1); 0 still plays on time, so lip sync and hooks go on */
   volume: number
-  /** current mouth openness and vowel shape, useful for a stage's audio meter */
+  /** the mouth openness the voice gives now, 0..1 (a level meter) */
   readonly level: number
+  /** the vowel's shape now: -1 round (o, u) .. 1 wide (i, e), 0 neither */
   readonly vowel: number
-  /** Post-volume voice stream after unlock(); borrowed tracks stay live until dispose(). */
+  /** the voice as it plays, after the volume, for a call or a recording: null before unlock(), then the same stream
+   *  until dispose(), which ends its tracks. Only this speech's voice */
   readonly stream: MediaStream | null
   /** silence now: what plays stops, what is still loading is dropped */
   stop(): void
@@ -95,7 +100,7 @@ export function createSpeech(player: Host, options: LipSyncOptions = {}): Speech
       s.enqueue(u, { onStart: hooks?.onStart, onEnd: () => { revoke(); hooks?.onEnd?.() }, onFail: () => { revoke(); hooks?.onFail?.() } })
     },
     get volume() { return volume },
-    set volume(v: number) { volume = Math.max(0, Math.min(1, v)); s.setVolume(volume) },
+    set volume(v: number) { if (Number.isFinite(v)) { volume = Math.max(0, Math.min(1, v)); s.setVolume(volume) } },
     get level() { return s.read() },
     get vowel() { return s.vowel() },
     get stream() { return s.stream },
