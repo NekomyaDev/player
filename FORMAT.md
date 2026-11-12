@@ -49,7 +49,7 @@ All coordinates are pixels of the drawing (`canvas`): origin top left, y down.
 | `version` | `4` | yes | the major version (§9) |
 | `name` | string | yes | the character's name, at most 64 characters |
 | `meta` | object | yes | §3 |
-| `requires` | string[] | | features a reader must have to draw the model right (§9); none are defined in 4.0, write `[]` |
+| `requires` | string[] | | features a reader must have to draw the model right (§9): `full_body` for a full-body character (§5), else `[]` |
 | `files` | object | | the optional files (§4) |
 | `canvas` | `[width, height]` | yes | integers, 16–8192 |
 | `profile` | object | | §5 |
@@ -145,6 +145,28 @@ Paths are relative to `model.json`, use `/`, and contain no `..`, scheme or driv
 | `brow_lines` | per brow, sampled at `x`: its lower edge (`bottom`), the lid line (`lid`) and, under opaque bangs, how far it may move (`cap`) |
 | `jaw` | `top`, `chin`, and how far the jaw drops at each mouth frame (`half`, `open`, `round`, `wide`) |
 | `chest` | `{cx, cy, rx, ry}`: where breathing and the chest spring act |
+| `frame`, `body`, `hair_bottom_y` | a full-body character's (below) |
+
+### Full-body characters (4.1)
+
+A full-body character is drawn whole, head to feet, on a tall canvas (LivLiv's are 1536 × 3072), and stands on the
+ground: a player keeps its feet there while the upper body moves as a half-body character's does. It has three more
+anchors, lists `full_body` in `requires`, and usually pins its mesh lattice (`rig.lattice`, Appendix C):
+
+| field | |
+|---|---|
+| `frame` | `[x0, y0, x1, y1]`: the head-and-chest window a player shows by default, as a half-body character fills its canvas. It may reach past the canvas's edges (room above the head), by at most the canvas's size |
+| `body` | the body's points, each `[x, y, confidence]`: `hip_l`, `hip_r`, `ankle_l`, `ankle_r` (required) and `knee_*`, `shoulder_*`, `elbow_*`, `wrist_*`, `neck`, where `_r` is the character's right, on the viewer's left; `ground_y`, the line the soles stand on (required); `hem_y` and `hem_x` (`[left, right]`), where a skirt or a coat ends (missing: nothing hangs); `conf`, how sure the pose estimate is overall |
+| `hair_bottom_y` | the lowest row of the hair: long hair swings with its full weight there, not at the feet |
+
+How the reference player moves one (informative): the upper body turns as one piece above a band at the waist; the
+whole figure sways from the ankles, so a sideways move of the face in the camera sways it instead of sliding it; the
+hips follow the upper body through a spring and shift their weight a little by themselves; a hem hangs behind them; a
+move down crouches the figure (the legs shorten as straight lines, the feet stay) and a talking bob dips the upper body
+only; only a hop's flight lifts the whole figure. `bottom_y` here is where the feet end, never a cut edge. A player
+shows the `frame` by default, and may offer the whole figure or the figure down to the knees.
+
+A model with `body` has `frame`, its hips lie below `neck_y` and above its ankles, and its face has a width.
 
 ## 6. `expressions`
 
@@ -207,6 +229,7 @@ Writers MUST produce, and readers MAY refuse anything else:
 6. Every layer's box lies inside the canvas.
 7. Every entry of `requires` is a feature the reader has.
 8. Writers start ids outside the standard list with `x_`.
+9. A model with `anchors.body` lists `full_body` in `requires` and has `anchors.frame` (§5).
 
 What readers do:
 
@@ -217,9 +240,9 @@ What readers do:
 4. Refuse a model whose layer image is missing; warn and play on when an optional file is missing.
 5. Hold packages to limits before decoding. The reference player's: `model.json` 4 MB; canvas 8192 px a side; 512
    layers; 2048 ZIP entries and 256 MB uncompressed; `keyforms.json` 32 MB; no entry with `..`, an absolute path or
-   encryption; and what the meshes would cost, from the boxes alone: 2 097 152 vertices on a lattice of
-   `max(6, round(max(width, height) / 128))` px, 1 048 576 of them times the chains bending them, a chain named once per
-   layer.
+   encryption; and what the meshes would cost, from the boxes alone: 2 097 152 vertices on a lattice of `rig.lattice`
+   px, or `max(6, round(max(width, height) / 128))` without it, 1 048 576 of them times the chains bending them, a chain
+   named once per layer.
 6. Treat everything in the package as data: there is nothing to run and no URL to fetch, and every string (names,
    labels, credits) is shown as plain text.
 7. Draw the watermark the package asks for (§3).
@@ -241,6 +264,9 @@ Changes:
 
 - **4.0** (November 2026): first version of this format (from v3: renamed, `meta`, `files`, `requires`, standard
   expression ids with names by language, real image paths, build-internal data and Cubism-style `params` left out).
+- **4.1** (November 2026): full-body characters: `anchors.frame`, `anchors.body`, `anchors.hair_bottom_y`, the feature
+  `full_body` (§5); `rig.lattice` (Appendix C). LivLiv Player reads them from 0.5; 0.4 and earlier refuse a model that
+  lists the feature.
 
 ## Appendix A: standard expression ids (4.0)
 
@@ -288,6 +314,7 @@ Changes:
 | `body` | `yaw`, `roll`: how much the torso follows the head; `breath`; `bust`: the chest spring, which LivLiv writes as 0 and players read as 0 whatever it says (LivLiv Player from 0.4) |
 | `neck` | `twist`, `reach`: the neck twisting with the head |
 | `jaw` | the jaw drop for a model whose frames measured none |
+| `lattice` | the mesh lattice's cell in px, a whole number from 6 to 256 (4.1). Missing: `max(6, round(max(width, height) / 128))`. A full-body character keeps its head-and-chest density on its tall canvas with it: LivLiv writes 12 for 1536 × 3072, where the formula gives 24 |
 | `chains` | pieces that swing on their own: a rope of `points` (root first) with `k`, `damp`, `drive`, `hang`, `wind`, `freq`, `limit`, `sigma`, `reach`, `bias` |
 
 The schema gives the reference player's default for each.

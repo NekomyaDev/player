@@ -1,10 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://livliv.ai/schema/livliv-model-v4.json",
-  "$comment": "Format 4.0 (FORMAT.md). The $id is where it will be published. This schema covers model.json; the rules it cannot express (unique ids, references that resolve, files present, image sizes) are FORMAT.md §8.",
+  "$comment": "Format 4.1 (FORMAT.md). The $id is where it will be published. This schema covers model.json; the rules it cannot express (unique ids, references that resolve, files present, image sizes) are FORMAT.md §8.",
   "title": "LivLiv model package, format 4: model.json",
   "type": "object",
   "required": ["format", "version", "name", "meta", "canvas", "anchors", "layers"],
+  "if": { "properties": { "anchors": { "required": ["body"] } }, "required": ["anchors"] },
+  "then": { "required": ["requires"], "properties": { "requires": { "contains": { "const": "full_body" } } } },
   "properties": {
     "format": { "const": "livliv-model", "description": "The format. Packages before format 4 say livemaker-puppet (FORMAT-v3.md)." },
     "version": { "const": 4, "description": "The major version. It changes only when a field changes meaning, is removed, or the structure changes (FORMAT.md §9)." },
@@ -13,7 +15,7 @@
     "requires": {
       "type": "array", "uniqueItems": true, "default": [],
       "items": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,47}$" },
-      "description": "Features a reader must have to draw this model right. A reader lacking one refuses the model and names it, rather than drawing it wrong. None are defined in 4.0."
+      "description": "Features a reader must have to draw this model right. A reader lacking one refuses the model and names it, rather than drawing it wrong. Defined: full_body (4.1: anchors.body, FORMAT.md §5)."
     },
     "files": { "$ref": "#/$defs/files" },
     "canvas": {
@@ -221,10 +223,36 @@
           "type": "object", "required": ["cx", "cy", "rx", "ry"],
           "properties": { "cx": { "type": "number" }, "cy": { "type": "number" }, "rx": { "type": "number" }, "ry": { "type": "number" } },
           "additionalProperties": false, "description": "The chest ellipse, where breathing and the chest spring act."
-        }
+        },
+        "frame": { "$ref": "#/$defs/box", "description": "Full-body characters (4.1): the head-and-chest window a player shows by default, as a half-body character fills its canvas. It may reach past the canvas's edges." },
+        "body": {
+          "type": "object", "required": ["hip_l", "hip_r", "ankle_l", "ankle_r", "ground_y"],
+          "properties": {
+            "hip_l": { "$ref": "#/$defs/bodyPoint" }, "hip_r": { "$ref": "#/$defs/bodyPoint" },
+            "ankle_l": { "$ref": "#/$defs/bodyPoint" }, "ankle_r": { "$ref": "#/$defs/bodyPoint" },
+            "knee_l": { "$ref": "#/$defs/bodyPoint" }, "knee_r": { "$ref": "#/$defs/bodyPoint" },
+            "shoulder_l": { "$ref": "#/$defs/bodyPoint" }, "shoulder_r": { "$ref": "#/$defs/bodyPoint" },
+            "elbow_l": { "$ref": "#/$defs/bodyPoint" }, "elbow_r": { "$ref": "#/$defs/bodyPoint" },
+            "wrist_l": { "$ref": "#/$defs/bodyPoint" }, "wrist_r": { "$ref": "#/$defs/bodyPoint" },
+            "neck": { "$ref": "#/$defs/bodyPoint" },
+            "ground_y": { "type": "number", "description": "The ground line the soles stand on." },
+            "conf": { "type": "number", "minimum": 0, "maximum": 1, "description": "How sure the pose estimate is overall; a player does not read it." },
+            "hem_y": { "type": "number", "description": "Where a skirt or a coat ends; missing: nothing hangs." },
+            "hem_x": { "type": "array", "prefixItems": [{ "type": "number" }, { "type": "number" }], "items": false, "minItems": 2, "description": "The hem's left and right ends at hem_y." }
+          },
+          "additionalProperties": false,
+          "description": "Full-body characters (4.1): the body's points as [x, y, confidence] (_r is the character's right, on the viewer's left), its ground line and its hem. With it the model needs anchors.frame and lists full_body in requires."
+        },
+        "hair_bottom_y": { "type": "number", "description": "Full-body characters (4.1): the lowest row of the hair, where long hair swings with its full weight." }
       },
+      "dependentRequired": { "body": ["frame"] },
       "patternProperties": { "^x-": {} },
       "additionalProperties": false
+    },
+
+    "bodyPoint": {
+      "type": "array", "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number", "minimum": 0, "maximum": 1 }], "items": false, "minItems": 3,
+      "description": "[x, y, confidence] in canvas pixels, the confidence 0..1."
     },
 
     "chain": {
@@ -280,6 +308,7 @@
           "additionalProperties": false
         },
         "jaw": { "type": "number" },
+        "lattice": { "type": "integer", "minimum": 6, "maximum": 256, "description": "The mesh lattice's cell (px). Missing: max(6, round(max(width, height) / 128)). A full-body character keeps its head-and-chest density on its tall canvas with it (4.1)." },
         "chains": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/chain" } }
       },
       "patternProperties": { "^x-": {} },
