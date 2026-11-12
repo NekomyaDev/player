@@ -132,7 +132,7 @@ try {
 | `invalid` | a model, but something in it is wrong or damaged |
 | `too-large` | over this player's limits, or the GPU's memory |
 | `newer-format` | written for a newer player |
-| `missing-feature` | needs something this page or player does not have (a full-body character: they come in a later version) |
+| `missing-feature` | needs something this page or player does not have (a feature in its `requires` this player lacks) |
 | `missing-file` | a file it names is not among the files |
 | `context-lost` | the canvas's WebGL context is gone, see [below](#when-the-context-is-lost) |
 | `released` | the canvas gave its context up with `dispose({ release: true })`: use a new canvas |
@@ -144,6 +144,7 @@ try {
 | `name` | the character's name |
 | `format`, `version` | `"livliv-model"` and 4, or `"livemaker-puppet"` and 3 for a package from before v4 (see [Format version](#format-version)) |
 | `size` | `[width, height]` the character was drawn at |
+| `fullBody` | a full-body character: it stands on the ground, framed by `view.fit` (see [Full-body characters](#full-body-characters)) |
 | `expressions` | `{ id, label, labels }[]`: what `setExpression()` takes. Standard ids (`smile`, `shy`, `angry`, `sad`, `surprised` …, [FORMAT.md](FORMAT.md#appendix-a-standard-expression-ids-40)) mean the same on every model; `x_…` ids are the model's own. `label` is the name in `lang`, `labels` every language's |
 | `watermark` | the mark drawn over the character: `"LivLiv"`, the owner's own text, or `null` |
 | `meta` | a v4 package's `meta`: `author`, `license` (`{ id, url }`), `generator`, `created`, `watermark`; `null` before v4 |
@@ -184,8 +185,9 @@ not a number counts as the default.
 
 ### Placement and the loop
 
-- `view`: `{ x, y, zoom, head }`. `x`, `y` move the character by shares of the canvas (y up), `zoom` scales it about the
-  center, `head: true` frames the head instead of the whole drawing (avatars, chat bubbles).
+- `view`: `{ x, y, zoom, head, fit }`. `x`, `y` move the character by shares of the canvas (y up), `zoom` scales it about the
+  center, `head: true` frames the head instead of the whole drawing (avatars, chat bubbles), `fit` is a full-body
+  character's shot: `'frame'` (default), `'knee'` or `'whole'` (see [Full-body characters](#full-body-characters)).
 - `play()`, `pause()`, `playing`. The loop also skips drawing while the canvas is scrolled out of view (unless `renderWhenHidden`).
 - `resize()`: draws now at the canvas's current size. Only needed after resizing a paused player.
 - `maxPixelRatio`: as the option, and it can be changed at any time.
@@ -385,9 +387,11 @@ const remove = player.use({
 remove()
 ```
 
-`frame` has `params` (the pose so far), `dt`, `time`, `tracked` (a face tracker drives the head), `add(offsets)` and
-`move` (`{ x, y, s }`: move / scale the picture this frame). `order` sorts drivers: face tracking -10, yours 0,
-lip sync 10. `dispose()` is called when a driver is removed.
+`frame` has `params` (the pose so far), `dt`, `time`, `tracked` (a face tracker drives the head), `add(offsets)`,
+`move` (`{ x, y, s }`: move / scale the picture this frame), `talk` (a talking bob, a share of the canvas, <= 0: lip sync
+writes it) and `grounded` (a full-body character, whose feet stay on the ground: a move down crouches it, `move.x`
+sways it and `talk` dips its upper body). `order` sorts drivers: face tracking -10, yours 0, lip sync 10. `dispose()`
+is called when a driver is removed.
 
 ## Characters that aren't LivLiv models: `@livliv-dev/player/body`
 
@@ -473,8 +477,29 @@ drawing it wrong; a model whose `requires` names a feature this player does not 
 it does not know it ignores. Packages from before v4 (`"livemaker-puppet"`, `LEGACY_FORMAT`, version 3, or no field)
 play as they are. The rules for what changes the version: [FORMAT.md §9](FORMAT.md#9-versions-and-additions).
 
-Full-body characters, livliv.ai's newer kind (a tall canvas whose `anchors` have `body`, with the feet on a ground line),
-are refused with `missing-feature`: this player would draw them wrong, and a later version plays them.
+A full-body character's package lists the feature `full_body` (format 4.1), which this player has; 0.4 and earlier
+refuse it with `missing-feature`.
+
+## Full-body characters
+
+A full-body character (`model.fullBody`) is drawn head to feet on a tall canvas and stands on the ground. Everything
+above works on it as on a half-body one; what differs is the shot and how it moves:
+
+- **The shot**: `view.fit` picks what the canvas shows. `'frame'` (the default) is its head and chest, so a full-body
+  character fills a canvas as a half-body one does; `'knee'` shows it down to a little below the knees, `'whole'` the
+  whole figure. `view.head`, `zoom`, `x` and `y` work on top of it. On a half-body character `fit` changes nothing.
+- **Its feet stay on the ground**: the upper body turns and leans as one piece above the waist, and the whole figure
+  sways from the ankles. A face tracker's sideways move sways it instead of sliding it; leaning toward the camera
+  crouches it a little (the legs shorten, the feet stay) and leaning away is not followed; closer and further scale it
+  about the ground line. A hop crouches, flies and lands. Lip sync's talking bob dips the upper body. The hips follow
+  the upper body and shift their weight a little by themselves, and a skirt's or coat's hem hangs behind them.
+- **Drivers** see `frame.grounded`, and move it with `frame.move` and `frame.talk` as on any character: the player
+  turns them into the sway, the crouch and the dip.
+
+```js
+const info = await player.load('/models/standing.livliv')
+if (info.fullBody) player.view.fit = 'whole'   // the whole figure, on a tall canvas
+```
 
 ## Browser support
 
@@ -518,9 +543,11 @@ JSON.
 player takes the pose's view, the mark stays, and `resize()` and `snapshot()` draw the same pose again until `play()`.
 Before a model is loaded, after `dispose()` or once the context is lost, it draws nothing.
 
-`crouch`, `dip` and `talk` are reserved for full-body characters, which a later version plays: their feet stay on the
-ground, so a hop crouches the hips and a syllable dips the upper body instead of moving the picture. This version
-never sets them and ignores them.
+A full-body character's pose has three more numbers, as its feet stay on the ground: `crouch`, how far the hips went
+down (a hop's crouch, a lean toward the camera), and `dip`, how far the upper body dipped on a syllable, both shares of
+the frame's height (<= 0), and `talk`, the talking bob the dip came from. Its `move.y` is only a hop's lift (>= 0) and
+`move.x` sways it from the ankles. `renderPose()` draws the crouch and the dip; a half-body character's pose has none of
+the three, and a half-body character ignores them.
 
 ## Response profiles
 
@@ -560,5 +587,5 @@ character that follows it (a hat, a sticker, a name tag): `{ x, y, rotation, sca
 canvas from its top left, `rotation` in radians (clockwise) and `scale` a width that fits there (about the head's, or
 the shoulders' for the torso) as a share of the canvas's width. Call it after a frame, in `onFrame` for one. It is null
 before the model's first frame, and for a point a body does not have. The point moves with actions, the view and the
-body's own motion; it is a point and an angle, not a skeleton, and does not bend what you put there. A `Body` of your
+body's own motion (on a full-body character, its sway, crouch and dip too); it is a point and an angle, not a skeleton, and does not bend what you put there. A `Body` of your
 own can have `anchor(name)`; without it only `'head'` is there, from its `head()`.

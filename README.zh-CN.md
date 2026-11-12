@@ -99,7 +99,7 @@ Kujira、Kujira Q 和 Pen 来自别人的作品，不适用上面的许可和署
 
 - **PNGTuber**：两张图（闭嘴、张嘴），有闭眼的两张更好。
 - **VRM**：VRoid Studio 或任何能导出 VRM 0.x / 1.0 的工具做的。
-- **LivLiv 模型**：在 [livliv.ai](https://livliv.ai) 用一张图做出角色，在角色页下载**模型包**（一个 `.livliv` 文件），直接传给 `load()`（URL，或用户选的 `File`），解压后的文件夹也可以。免费版的模型包带 LivLiv 水印，播放器会画出来。全身角色要等播放器的后续版本。
+- **LivLiv 模型**：在 [livliv.ai](https://livliv.ai) 用一张图做出角色，在角色页下载**模型包**（一个 `.livliv` 文件），直接传给 `load()`（URL，或用户选的 `File`），解压后的文件夹也可以。免费版的模型包带 LivLiv 水印，播放器会画出来。全身角色也能播放（0.5 起），双脚站在地面上；livliv.ai 暂时还不提供全身角色的模型包。
 
 ## 关于播放器和角色
 

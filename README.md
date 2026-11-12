@@ -121,7 +121,7 @@ picture on [livliv.ai](https://livliv.ai).
 - **A LivLiv model**: make one from a picture on [livliv.ai](https://livliv.ai), then download its model package from
   the character's page (**Model package**): a `.livliv` file. Pass it to `load()` as it is (a URL, or the `File`
   someone picked), or unzipped as a folder. Packages on the free plan carry the LivLiv mark, and the player draws it.
-  Full-body characters come in a later version of the player.
+  Full-body characters play too (from 0.5), standing on the ground; livliv.ai does not offer their packages yet.
 
 ## About the player and the characters
 

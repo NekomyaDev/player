@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.5.0
+
+Full-body characters play, standing on the ground, and the free plan's mark has its new look. Half-body characters
+draw as in 0.4, to the pixel. A page written for 0.4 needs no change.
+
+### New
+
+- **Full-body characters**, livliv.ai's newer kind: drawn head to feet on a tall canvas, the feet on the ground. The
+  upper body moves as a half-body character's; the whole figure sways from the ankles, the hips follow and shift their
+  weight, a skirt's or coat's hem hangs behind them; a lean toward the camera and a hop crouch it, a hop lands, and
+  lip sync dips the upper body instead of the whole picture. See [API.md](API.md#full-body-characters).
+- `view.fit`: a full-body character's shot, `'frame'` (head and chest, the default), `'knee'` or `'whole'`.
+- `ModelInfo.fullBody`; `frame.talk` (the talking bob, apart from `frame.move`) and `frame.grounded` for drivers; the
+  `Fit` type.
+- A full-body character's `PlaybackPose` has `crouch`, `dip` and `talk`, and `renderPose()` draws them.
+- Format 4.1 ([FORMAT.md](FORMAT.md#full-body-characters-41)): `anchors.frame`, `anchors.body`,
+  `anchors.hair_bottom_y`, `rig.lattice` and the feature `full_body`, in the schema too.
+- A model's `tuning.fringe` (how far the bangs stand off the face, livliv.ai's feel setting) is read. livliv.ai's
+  packages write it into the bangs' depth instead, so every player draws them alike.
+
+### Changed
+
+- **The free plan's mark over the character** is smaller and white inside a thin dark line, so it shows on light
+  clothes as on dark ones, as on livliv.ai. The corner mark and the featured characters are unchanged.
+- Lip sync puts its talking bob in `frame.talk` instead of adding it to `frame.move.y`; the picture moves as before.
+- Full-body characters are no longer refused.
+
 ## 0.4.0
 
 Ways to record a character and show it in more than one place, and two changes to what a character does: the chest

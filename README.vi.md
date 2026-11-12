@@ -121,7 +121,7 @@ Bạn có thể đưa vào ảnh của một PNGTuber, hoặc một VRM (vẽ b�
 - **Một model LivLiv**: tạo một model từ một ảnh trên [livliv.ai](https://livliv.ai), rồi tải gói model từ
   trang của nhân vật đó (**Model package**): một file `.livliv`. Đưa file đó vào `load()` nguyên như vậy (một URL, hoặc `File`
   người dùng đã chọn), hoặc giải nén thành thư mục. Gói model thuộc tài khoản miễn phí (free plan) sẽ mang dấu LivLiv, và trình phát sẽ vẽ dấu đó.
-  Nhân vật toàn thân sẽ được hỗ trợ trong một phiên bản sau của trình phát.
+  Nhân vật toàn thân cũng phát được (từ 0.5), chân luôn đứng trên mặt đất; livliv.ai hiện chưa cung cấp gói mô hình của nhân vật toàn thân.
 
 ## Về trình phát và các nhân vật
 
