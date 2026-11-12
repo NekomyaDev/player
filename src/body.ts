@@ -1,3 +1,5 @@
+import { projectedAnchor, type AnchorName, type AttachmentAnchor } from './anchors'
+export type { AnchorName, AttachmentAnchor } from './anchors'
 // @livliv-dev/player/body: characters that aren't LivLiv models, on the surface of Player. A Body draws one (a PNGTuber's
 // pictures: @livliv-dev/player/png; a VRM: @livliv-dev/player/vrm; or your own); the BodyPlayer gives it what a LivLiv model gets
 // from Player: the idle motion, expressions, actions and drivers, so lip sync (@livliv-dev/player/voice) and face tracking
@@ -10,7 +12,8 @@ import type { Seen } from './follow'
 import { claimCanvas } from './release'
 
 export { LivLivError }
-export type { ActionId, Driver, Frame, Host, LivLivErrorCode, LoadOptions, LoadProgress, PlayerOptions, View } from './base'
+export type { ParameterProfile, ParameterSample, ParameterRule } from './profile'
+export type { ActionId, Driver, Frame, Host, LivLivErrorCode, LoadOptions, LoadProgress, PlaybackPose, PlayerOptions, View } from './base'
 
 /** an expression a Body can show: `labels` its names by language (BCP 47 tag -> name), `label` the one to fall back on */
 export interface BodyExpression { id: string; label: string; labels?: Labels }
@@ -35,6 +38,8 @@ export interface Body {
   render(canvas: HTMLCanvasElement, pose: Pose, w: number, h: number, dt: number): void
   /** where the head is, in shares of the canvas (from the top left) and its radii */
   head(): { x: number; y: number; rx: number; ry: number }
+  /** optional rendered attachment points, in canvas shares (custom bodies may supply these) */
+  anchor?(name: AnchorName): AttachmentAnchor | null
   dispose(): void
 }
 
@@ -121,12 +126,21 @@ export class BodyPlayer extends PlayerBase<BodyInfo> {
     }))
   }
 
+  /** Rendered attachment point; a custom Body without anchors exposes only its existing head centre. */
+  getAnchor(name: AnchorName): AttachmentAnchor | null {
+    if (!this.info || this.disposed) return null
+    if (this.body.anchor) return this.body.anchor(name)
+    if (name !== 'head') return null
+    const h = this.body.head()
+    return projectedAnchor([h.x, h.y], [h.x + h.rx, h.y], (this.canvas.clientHeight || this.canvas.height) / Math.max(1, this.canvas.clientWidth || this.canvas.width))
+  }
+
   /** @internal */
   protected show(dt: number) {
     const f = this.frame, V = this.view
-    this.pose.move = { x: f.move.x + V.x, y: f.move.y + this.actions.y + V.y, s: f.move.s * V.zoom }
+    this.pose.move = { x: f.move.x + V.x, y: f.move.y + V.y, s: f.move.s * V.zoom }
     const dpr = Math.min(this.maxPixelRatio, window.devicePixelRatio || 1)
-    const w = Math.round(this.canvas.clientWidth * dpr), h = Math.round(this.canvas.clientHeight * dpr)
+    const [w, h] = this.renderSize ?? [Math.round(this.canvas.clientWidth * dpr), Math.round(this.canvas.clientHeight * dpr)]
     if (w >= 2 && h >= 2) this.body.render(this.canvas, this.pose, w, h, dt)
     this.time += dt
   }

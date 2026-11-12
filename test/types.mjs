@@ -17,20 +17,39 @@ fs.mkdirSync(path.join(dir, 'node_modules', path.dirname(name)), { recursive: tr
 fs.symlinkSync(root, path.join(dir, 'node_modules', name), 'dir')
 fs.writeFileSync(path.join(dir, 'use.ts'), `
 import { LivLivError, Player, VERSION, type ActionId, type Driver, type LivLivErrorCode, type LoadOptions, type LoadProgress, type ModelInfo, type View } from '${name}'
-import { preloadFaceModel, startFaceTracking, type FaceTracking } from '${name}/tracking'
+import { preloadFaceModel, startFaceTracking, TrackingFilter, parameterRule, readTrackingProfile, TRACKING_PARAMETERS, type TrackingParameter, type TrackingProfile, type ParameterRule, type FaceTracking } from '${name}/tracking'
 import { createSpeech, startLipSync, type LipSync } from '${name}/voice'
 import { BODY_LIMIT, BodyPlayer, LivLivError as FromBody, type Body } from '${name}/body'
 import { PngBody } from '${name}/png'
 import { VrmBody } from '${name}/vrm'
 declare const canvas: HTMLCanvasElement
-const player = new Player(canvas)
+const player = new Player(canvas, { parameterProfile: {} })
+player.parameterProfile = { angleX: { input: [-20, 20], output: [-30, 30], curve: 1, smoothing: .2 } }
+const sampleAngle: number | undefined = player.parameterSample?.output.angleX
+void sampleAngle
 const model: Promise<ModelInfo> = player.load('/avatars/sena.livliv')
 const driver: Driver = { update(frame) { frame.add({ angleX: 1 }) } }
 const view: View = player.view
 const tracking: Promise<FaceTracking> = startFaceTracking(player)
+const channels: readonly TrackingParameter[] = TRACKING_PARAMETERS
+const rule: ParameterRule = parameterRule('angleX')
+const filter = new TrackingFilter(); filter.apply(player.params, 1 / 60); filter.reset()
+const profile: TrackingProfile = readTrackingProfile({ angleX: rule })
+void tracking.then((face) => { face.profile = profile; const value: number | undefined = face.sample?.output.angleX; return value })
+void channels
+// @ts-expect-error breathing is not a camera tracking input
+const unsupported: TrackingProfile = { breath: rule }
+void unsupported
 const sync: Promise<LipSync> = startLipSync(player)
-const body: Body = new PngBody()
+const png = new PngBody({ pixelated: true })
+png.pixelated = false
+const body: Body = png
 const bodyPlayer = new BodyPlayer(canvas, body)
+const anchor = player.getAnchor('head')
+const bodyAnchor = bodyPlayer.getAnchor('body')
+void [anchor?.rotation, anchor?.scale, bodyAnchor?.x]
+// @ts-expect-error only the two documented attachment points are available
+player.getAnchor('hand')
 player.use(driver)
 void [VERSION, model, view, tracking, sync, preloadFaceModel(), createSpeech(player), BODY_LIMIT, bodyPlayer, new VrmBody()]
 // the expressions getter keeps the model's label fields on both players (issue #8): label is a string, labels a map

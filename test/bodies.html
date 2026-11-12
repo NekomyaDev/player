@@ -407,5 +407,52 @@
     }
     return out
   }
+  window.runStagePlayback = async () => {
+    const c = document.createElement('canvas'); c.style.cssText = 'width:200px;height:240px'; document.body.append(c)
+    const p = new BodyPlayer(c, new PngBody(), { autoplay: false, idle: false, followPointer: false })
+    const out = {}, speech = createSpeech(p)
+    try {
+      await p.load({ closed: await solid('#ff0000'), open: await solid('#00ff00') })
+      let pose, calls = 0
+      p.use({ update(f) { calls++; f.params.mouthOpen = 1 } })
+      p.onFrame = (frame) => { pose = frame }
+      p.act('hop'); p.play(); await wait(130); p.pause()
+      const before = calls
+      p.renderPose(pose, 1 / 30, [640, 960])
+      const ctx = c.getContext('2d')
+      out.pose = { width: c.width, height: c.height, drivers: calls === before, action: Math.abs(pose.move.y) > 0.001, mouth: p.getPose().params.mouthOpen }
+      out.pixel = [...ctx.getImageData(320, 480, 1, 1).data]
+      out.streamBefore = speech.stream === null
+      speech.unlock()
+      const tapped = speech.stream, tapContext = new AudioContext(), source = tapContext.createMediaStreamSource(tapped), meter = tapContext.createAnalyser()
+      source.connect(meter); meter.fftSize = 1024
+      const samples = new Float32Array(meter.fftSize)
+      let peak = 0
+      const measuring = setInterval(() => { meter.getFloatTimeDomainData(samples); peak = Math.max(peak, ...samples.map(Math.abs)) }, 10)
+      out.streamLive = tapped.getAudioTracks()[0].readyState === 'live'
+      speech.volume = 0.35; out.volume = speech.volume
+      const hooked = (clip) => new Promise((resolve) => {
+        const events = [], timeout = setTimeout(() => resolve(['timeout']), 5000)
+        speech.say(clip, { onStart: () => events.push('start'), onEnd: () => { clearTimeout(timeout); resolve([...events, 'end']) }, onFail: () => { clearTimeout(timeout); resolve([...events, 'fail']) } })
+      })
+      out.response = await hooked(new Response(await wav(0.15, 24000).arrayBuffer(), { headers: { 'content-type': 'audio/wav' } }))
+      const bytes = new Uint8Array(await wav(0.5, 24000).arrayBuffer())
+      out.broken = await hooked(new Response(new ReadableStream({ start(controller) { controller.enqueue(bytes.slice(0, 4844)); setTimeout(() => controller.error(new Error('stream failed')), 120) } }), { headers: { 'content-type': 'audio/wav' } }))
+      out.after = await hooked(wav(0.15, 24000))
+      let cancelled = false
+      speech.say(new Response(new ReadableStream({ cancel() { cancelled = true } }), { headers: { 'content-type': 'audio/wav' } }))
+      await wait(30); speech.stop(); await wait(30); out.cancelled = cancelled
+      let cancelledOther = false
+      speech.say(new Response(new ReadableStream({ cancel() { cancelledOther = true } }), { headers: { 'content-type': 'audio/mpeg' } }))
+      await wait(30); speech.stop(); await wait(30); out.cancelledOther = cancelledOther
+      out.afterStop = await hooked(wav(0.15, 24000))
+      out.streamSound = peak > 0.001
+      out.streamStable = speech.stream === tapped && tapped.getAudioTracks()[0].readyState === 'live'
+      clearInterval(measuring); source.disconnect(); await tapContext.close()
+      speech.dispose(); out.streamEnded = tapped.getAudioTracks()[0].readyState === 'ended' && speech.stream === null
+    } finally { speech.dispose(); p.dispose(); c.remove() }
+    return out
+  }
+
 </script>
 </html>

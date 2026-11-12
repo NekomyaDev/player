@@ -38,6 +38,7 @@ export class SpeechPlayer {
   private cue = new VowelCue() // the voice's own balance, carried from one sentence to the next
   private out: GainNode | null = null              // every piece plays through it: the volume
   private volume = 1
+  private capture: MediaStreamAudioDestinationNode | null = null
   private owed = new Set<ClipHooks>()              // sentences with hooks whose onEnd / onFail is still to come
   private ticker = 0                               // watches them start and end while there are any
   /** called when the voice goes quiet: nothing playing and nothing left to load */
@@ -47,6 +48,9 @@ export class SpeechPlayer {
 
   /** the sound can be heard: the audio context is running */
   get running() { return this.ctx?.state === 'running' }
+
+  /** Post-volume voice for calls or recording. Owned here; available after unlock(). */
+  get stream() { return this.capture?.stream ?? null }
 
   /** 0 (silent, still playing on time: a muted preview) .. 1 */
   setVolume(v: number) { this.volume = v; if (this.out) this.out.gain.value = v }
@@ -62,6 +66,7 @@ export class SpeechPlayer {
       try { this.ctx = own ? new AC() : new AC({ sampleRate: RATE }) } catch { this.ctx = new AC() }
       try { const s = (navigator as AudioNav).audioSession; if (s) s.type = 'playback' } catch { /* not supported */ } // iOS: not muted by the silent switch
       this.out = this.ctx.createGain(); this.out.gain.value = this.volume; this.out.connect(this.ctx.destination)
+      this.capture = this.ctx.createMediaStreamDestination(); this.out.connect(this.capture)
       this.ctx.onstatechange = () => this.onState?.()
     }
     if (this.ctx.state !== 'running') {
@@ -75,7 +80,7 @@ export class SpeechPlayer {
   get busy() { return this.pending > 0 || this.clips.length > 0 }
 
   /** queue one sentence; it plays right after the ones before it, from its first piece on */
-  enqueue(url: string, hooks?: ClipHooks) {
+  enqueue(url: string | Response, hooks?: ClipHooks) {
     this.unlock()
     const ctx = this.ctx
     if (!ctx) { hooks?.onFail?.(); return }
@@ -88,7 +93,7 @@ export class SpeechPlayer {
       for (let x; (x = await coming.next()) && gen === this.gen;) clip = this.play(clip, x, coming.rate, h)
       if (gen !== this.gen) return // stop() has told its hooks
       this.pending--
-      if (clip) { clip.complete = true; this.update(clip); this.retire(clip) }
+      if (clip) { clip.complete = true; if (coming.failed) this.settle(h, false); this.update(clip); this.retire(clip) }
       else this.settle(h, false) // no sound came
       this.check()
     })
@@ -131,7 +136,7 @@ export class SpeechPlayer {
     return 0
   }
 
-  dispose() { this.stop(); this.onIdle = undefined; this.ctx?.close().catch(() => {}); this.ctx = null; this.out = null }
+  dispose() { this.stop(); this.onIdle = undefined; this.capture?.stream.getTracks().forEach((track) => track.stop()); this.capture = null; this.ctx?.close().catch(() => {}); this.ctx = null; this.out = null }
 
   /** context time of the sound reaching the listener now (output latency included: Bluetooth adds 100-250 ms) */
   private heardTime(ctx: AudioContext) {
@@ -217,13 +222,14 @@ export class SpeechPlayer {
 /** one sentence coming in: its samples as they arrive (a WAV stream), or all at once (an MP3) */
 class Incoming {
   rate = RATE
+  failed = false
   private got: Float32Array[] = []
   private ended = false
   private wake: (() => void) | null = null
 
-  constructor(url: string, ctx: BaseAudioContext, signal: AbortSignal) {
+  constructor(url: string | Response, ctx: BaseAudioContext, signal: AbortSignal) {
     this.load(url, ctx, signal)
-      .catch(() => { /* this sentence stays silent, or stops where it broke off; its text is on screen */ })
+      .catch(() => { this.failed = true })
       .finally(() => { this.ended = true; this.poke() })
   }
 
@@ -239,11 +245,24 @@ class Incoming {
   private poke() { const w = this.wake; this.wake = null; w?.() }
   private push(x: Float32Array) { if (x.length) { this.got.push(x); this.poke() } }
 
-  private async load(url: string, ctx: BaseAudioContext, signal: AbortSignal) {
-    const r = await fetch(url, { signal })
+  private async load(url: string | Response, ctx: BaseAudioContext, signal: AbortSignal) {
+    const r = typeof url === 'string' ? await fetch(url, { signal }) : url
     if (!r.ok) throw new Error(String(r.status))
-    if (r.body && /wav/.test(r.headers.get('content-type') || '')) return this.pcm(r.body.getReader(), ctx)
-    await this.decode(await r.arrayBuffer(), ctx)
+    if (!r.body) { await this.decode(await r.arrayBuffer(), ctx); return }
+    const reader = r.body.getReader(), cancel = () => { void reader.cancel(signal.reason).catch(() => {}) }
+    if (signal.aborted) { cancel(); return }
+    signal.addEventListener('abort', cancel, { once: true })
+    try {
+      if (/wav/.test(r.headers.get('content-type') || '')) await this.pcm(reader, ctx)
+      else {
+        const parts: Uint8Array[] = []
+        for (;;) { const { value, done } = await reader.read(); if (done) break; parts.push(value) }
+        const bytes = new Uint8Array(parts.reduce((size, part) => size + part.length, 0))
+        let at = 0
+        for (const part of parts) { bytes.set(part, at); at += part.length }
+        if (!signal.aborted) await this.decode(bytes.buffer, ctx)
+      }
+    } finally { signal.removeEventListener('abort', cancel); reader.releaseLock() }
   }
 
   private async decode(b: ArrayBuffer, ctx: BaseAudioContext) {

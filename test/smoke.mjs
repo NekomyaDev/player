@@ -305,6 +305,13 @@ try {
   const speechOk = rate.bad100.length > 0 && rate.idleFired && rateOk(rate.wav16, 16000) && rateOk(rate.wav24, 24000) && rate.generic16.length > 0 && Math.abs(secs(rate.generic16) - 1) < 0.02
   if (!speechOk) failed++
   console.log(`${speechOk ? 'ok  ' : 'FAIL'} speech keeps a WAV's own rate: bad rate ${JSON.stringify(rate.bad100)} (idle fired ${rate.idleFired}), 16 kHz ${JSON.stringify(rate.wav16)}, 24 kHz ${JSON.stringify(rate.wav24)}, decoded whole ${JSON.stringify(rate.generic16)}`)
+  const playback = await page.evaluate(() => window.runStagePlayback())
+  const playbackOk = playback.pose.width === 640 && playback.pose.height === 960 && playback.pose.drivers && playback.pose.action && playback.pose.mouth === 1
+    && playback.pixel[1] > 200 && playback.volume === 0.35 && playback.response.join() === 'start,end'
+    && playback.streamBefore && playback.streamLive && playback.streamSound && playback.streamStable && playback.streamEnded
+    && playback.broken.at(-1) === 'fail' && playback.after.join() === 'start,end' && playback.cancelled && playback.cancelledOther && playback.afterStop.join() === 'start,end'
+  if (!playbackOk) failed++
+  console.log(`${playbackOk ? 'ok  ' : 'FAIL'} Stage playback poses, streamed voice hooks and cancellation: ${JSON.stringify(playback)}`)
   const vrmOk = !v.error && v.format === 'vrm' && v.share > 0.02 && v.happy && v.smile && !v.unknown && v.tracked && v.head
     && ['Smile', 'Happy', 'Sad', 'Surprised', 'Wink'].every((l) => v.expressions.includes(l))
   if (!vrmOk) failed++

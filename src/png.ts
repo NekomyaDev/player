@@ -1,3 +1,4 @@
+import { projectedAnchor, type AnchorName, type AttachmentAnchor } from './anchors'
 // @livliv-dev/player/png: a PNGTuber on a BodyPlayer (@livliv-dev/player/body). A few pictures of the character, one shown at a
 // time: the mouth closed or open (the voice, the microphone), the eyes closed when it blinks (optional, and with the
 // mouth open too). The picture sways with the head, tilts, breathes and hops with the voice, standing on the bottom of
@@ -18,6 +19,11 @@ const MAX_SIDE = 8192, MAX_PIXELS = 64 * 2 ** 20
 
 export class PngBody implements Body {
   readonly format = 'png'
+  /** Disable filtering when enlarging pixel art. */
+  pixelated: boolean
+  private anchors: Partial<Record<AnchorName, AttachmentAnchor>> = {}
+
+  constructor(options: { pixelated?: boolean } = {}) { this.pixelated = options.pixelated ?? false }
   private pics: Partial<Record<PngSlot, ImageBitmap>> = {}
   private g: CanvasRenderingContext2D | null = null
 
@@ -56,6 +62,7 @@ export class PngBody implements Body {
     const g = (this.g ??= canvas.getContext('2d'))  // attach() has told the page if it cannot have one
     if (!g) return
     g.clearRect(0, 0, w, h)
+    g.imageSmoothingEnabled = !this.pixelated
     const x = this.pics
     if (!x.closed || !x.open) return
     const talk = P.mouthOpen > 0.18, shut = Math.min(P.eyeLOpen, P.eyeROpen) < 0.35
@@ -67,13 +74,21 @@ export class PngBody implements Body {
     const dy = (P.angleY / 30) * 0.012 * h + P.breath * 0.006 * h + move.y * h * 0.5
     g.save()
     g.translate(w / 2 + dx, h - dy)
-    g.rotate(((P.angleZ * 0.25 + P.bodyZ * 0.4) * Math.PI) / 180)
+    const rotation = ((P.angleZ * 0.25 + P.bodyZ * 0.4) * Math.PI) / 180
+    g.rotate(rotation)
     g.drawImage(img, -dw / 2, -dh, dw, dh)
     g.restore()
+    const point = (x: number, y: number): [number, number] => [(w / 2 + dx + x * Math.cos(rotation) - y * Math.sin(rotation)) / w, (h - dy + x * Math.sin(rotation) + y * Math.cos(rotation)) / h]
+    for (const name of ['head', 'body'] as const) {
+      const y = -dh * (name === 'head' ? .74 : .35)
+      this.anchors[name] = projectedAnchor(point(0, y), point(dw * (name === 'head' ? .16 : .3), y), h / w)
+    }
   }
 
   /** a picture's head: near the top, about the middle */
   head() { return { x: 0.5, y: 0.26, rx: 0.16, ry: 0.13 } }
 
-  dispose() { for (const b of Object.values(this.pics)) b?.close(); this.pics = {} }
+  anchor(name: AnchorName) { return this.anchors[name] ? { ...this.anchors[name] } : null }
+
+  dispose() { this.anchors = {}; for (const b of Object.values(this.pics)) b?.close(); this.pics = {} }
 }

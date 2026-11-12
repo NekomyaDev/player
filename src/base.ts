@@ -11,6 +11,7 @@ import { PARAM_RANGES, defaultParams, type Params } from './runtime/params'
 import { LivLivError } from './errors'
 import { Idle, type Seen } from './follow'
 import { releaseCanvas } from './release'
+import { TrackingFilter, type ParameterProfile, type ParameterSample } from './profile'
 
 export { LivLivError, type LivLivErrorCode } from './errors'
 
@@ -18,6 +19,8 @@ export { LivLivError, type LivLivErrorCode } from './errors'
 export type ActionId = Exclude<AnyAction, 'away'>
 
 export interface PlayerOptions {
+  /** Map final live parameters after idle, drivers and actions. Recorded poses bypass this mapping. */
+  parameterProfile?: ParameterProfile
   /** move by itself: breathe, blink, sway, look around (default true). Off: only your params and drivers move it */
   idle?: boolean
   /** the eyes and head follow the pointer anywhere on the page ('page', the default), only over the canvas
@@ -27,6 +30,8 @@ export interface PlayerOptions {
   maxPixelRatio?: number
   /** start the frame loop at once (default true) */
   autoplay?: boolean
+  /** keep drawing outside the viewport (default false), for live pose/output streams. Browser background throttling still applies */
+  renderWhenHidden?: boolean
   /** the language expression names are picked in (`expressions[].label`; a BCP 47 tag, default the browser's) */
   lang?: string
 }
@@ -34,6 +39,15 @@ export interface PlayerOptions {
 /** where the character sits in the canvas: x, y move it by shares of the canvas (y up), zoom scales it about the
  *  center; head: frame the head instead of the whole drawing (avatars, chat bubbles; a BodyPlayer does not use it) */
 export interface View { x: number; y: number; zoom: number; head: boolean }
+
+/** A complete displayed pose, independent of the character format. Safe to keep for a recording or send to another
+ *  player. The move includes actions; the view is applied separately. */
+export interface PlaybackPose {
+  params: Params
+  move: { x: number; y: number; s: number }
+  expr: Record<string, number>
+  view: View
+}
 
 /** one frame being put together, as a driver sees it */
 export interface Frame {
@@ -130,6 +144,8 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
   idle: boolean
   /** see PlayerOptions.followPointer */
   followPointer: 'page' | 'canvas' | false
+  /** see PlayerOptions.renderWhenHidden */
+  renderWhenHidden: boolean
   readonly view: View = { x: 0, y: 0, zoom: 1, head: false }
   /** see PlayerOptions.lang */
   readonly lang: string
@@ -138,12 +154,20 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
    *  its place and make a new player. On a page with many players, a new context can push out another: release those
    *  that have left (dispose({ release: true })) */
   onContextLost?: () => void
+  /** Called after a frame is drawn, with an independent copy of its final pose. */
+  onFrame?: (pose: PlaybackPose) => void
+
+  /** @internal */
+  private replaying = false
+  private replaySize: [number, number] | null = null
+  protected renderSize: [number, number] | null = null
 
   /** @internal */
   protected info: Info | null = null
   /** @internal */
   protected disposed = false
   private idler = new Idle()
+  private parameterFilter = new TrackingFilter()
   /** last frame's: a face tracker drove it, the mouth moved (the idle starts no move while the character talks) */
   private was = { tracked: false, mouth: 0 }
   /** @internal */
@@ -167,9 +191,11 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
   /** pose: the Params the subclass draws from, written to each frame */
   constructor(canvas: HTMLCanvasElement, pose: Params, options: PlayerOptions) {
     this.canvas = canvas
+    this.parameterProfile = options.parameterProfile ?? {}
     this.idle = options.idle ?? true
     this.followPointer = options.followPointer ?? 'page'
     this.lang = options.lang || uiLang()
+    this.renderWhenHidden = options.renderWhenHidden ?? false
     this.frame = {
       params: pose, dt: 0, time: 0, tracked: false, move: { x: 0, y: 0, s: 1 },
       add(o) {
@@ -280,7 +306,13 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
 
   /** a new character starts on a neutral face
    *  @internal */
-  protected neutral() { this.expr = {}; this.smile = 0 }
+  protected neutral() { this.expr = {}; this.smile = 0; this.replaying = false; this.parameterFilter.reset() }
+
+  /** Shared motion response for idle, pointer, tracking and speech. Setting it does not restart drivers. */
+  get parameterProfile(): ParameterProfile { return this.parameterFilter.profile }
+  set parameterProfile(value: ParameterProfile) { this.parameterFilter.profile = value }
+  /** Final live parameters before and after the response mapping; null before the first live frame. */
+  get parameterSample(): ParameterSample | null { return this.parameterFilter.sample }
 
   /** Shows an expression (an id from `expressions`), easing over from the one before; null goes back to neutral.
    *  weight: how strongly, 0..1. False when the model has no such expression */
@@ -324,12 +356,13 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
 
   play() {
     if (this.raf || this.disposed) return
+    this.replaying = false
     this.last = performance.now()
     const loop = (now: number) => {
       this.raf = requestAnimationFrame(loop)
       const dt = Math.min(0.05, (now - this.last) / 1000)
       this.last = now
-      if (this.visible) this.draw(dt)
+      if (this.visible || this.renderWhenHidden) this.draw(dt)
     }
     this.raf = requestAnimationFrame(loop)
   }
@@ -338,10 +371,41 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
 
   /** Draws now at the canvas's current size. A playing player follows the size by itself; call this after resizing a
    *  paused one */
-  resize() { this.draw(0) }
+  resize() { if (this.replaying) this.renderPose(this.getPose()); else this.draw(0) }
 
   /** The current frame as an image (PNG data URL), as the pose is now, the mark included */
-  snapshot(): string { this.draw(0); return this.canvas.toDataURL('image/png') }
+  snapshot(): string {
+    if (this.replaying) this.renderPose(this.getPose(), 0, this.replaySize ?? undefined)
+    else this.draw(0)
+    return this.canvas.toDataURL('image/png')
+  }
+
+  /** The final pose of the last frame, copied so a recording cannot change the player. */
+  getPose(): PlaybackPose {
+    return { params: { ...this.frame.params }, move: { ...this.frame.move }, expr: { ...this.shownExpr }, view: { ...this.view } }
+  }
+
+  /** Draws a recorded pose without running idle motion, drivers or actions again. Pause first. `dt` advances hair and
+   *  other physics; `size` sets exact output pixels even on a detached canvas. The model's mark is retained. */
+  renderPose(pose: PlaybackPose, dt = 0, size?: [number, number]): void {
+    if (this.playing) throw new TypeError('LivLiv: pause the player before rendering a recorded pose')
+    if (this.disposed) throw new LivLivError('released', 'LivLiv: this player was disposed')
+    if (this.contextLost) throw contextGone()
+    if (!this.drawable) return
+    if (!Number.isFinite(dt) || dt < 0 || (size && size.some((n) => !Number.isInteger(n) || n < 1))) {
+      throw new TypeError('LivLiv: renderPose needs a nonnegative dt and positive integer output dimensions')
+    }
+    Object.assign(this.frame.params, pose.params)
+    Object.assign(this.frame.move, pose.move)
+    Object.assign(this.view, pose.view)
+    const expr = this.shownExpr
+    for (const key of Object.keys(expr)) delete expr[key]
+    Object.assign(expr, pose.expr)
+    this.replaying = true; this.replaySize = size ?? null
+    this.renderSize = this.replaySize
+    try { this.show(dt) } finally { this.renderSize = null }
+    this.onFrame?.(this.getPose())
+  }
 
   /** Stops, removes the drivers and frees the GPU memory. A load still running rejects. The canvas keeps its WebGL context
    *  and can take a new player afterwards. release: also give the context up, when the canvas is leaving the page: a
@@ -365,6 +429,7 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
     this.canvas.removeEventListener('webglcontextlost', this.onLost)
     this.io?.disconnect()
     for (const d of this.drivers.splice(0)) d.dispose?.()
+    this.onFrame = undefined
     this.free()
     this.info = null
   }
@@ -392,10 +457,13 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
       const v = +P[k]
       P[k] = v === v ? clamp(v, PARAM_RANGES[k][0], PARAM_RANGES[k][1]) : DEFAULTS[k]
     }
+    Object.assign(P, this.parameterFilter.apply(P, dt))
     // expressions ease in and out (one no longer shown eases back to 0); dozing hides them, each is a face with open eyes
     for (const k of Object.keys(this.expr)) if (!(k in E)) E[k] = 0
     for (const k of Object.keys(E)) E[k] += ((this.expr[k] ?? 0) * (1 - A.awayW) - E[k]) * Math.min(1, dt * 8)
+    f.move.y += A.y
     this.show(dt)
+    this.onFrame?.(this.getPose())
     if (this.posterOver) this.setPoster()
   }
 

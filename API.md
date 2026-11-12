@@ -60,6 +60,7 @@ new Player(canvas: HTMLCanvasElement, options?: PlayerOptions)
 | `followPointer` | `'page'` | follows the pointer anywhere on the page, only over the canvas (`'canvas'`), or not (`false`): the eyes lead and the head turns a little (about 13° at most), the brows lift when it comes near or moves fast, a soft look and now and then a smile while it rests on the face, and the character looks back at the viewer when it rests elsewhere or leaves |
 | `maxPixelRatio` | `2` | drawing-buffer pixels per CSS pixel at most; `1` saves power on high-DPI screens |
 | `autoplay` | `true` | start the frame loop at once |
+| `renderWhenHidden` | `false` | continue drivers, drawing and `onFrame` outside the viewport for live output; browser background throttling still applies |
 | `lang` | the browser's | the language `expressions[].label` is picked in (a BCP 47 tag: `en`, `ja`, `zh-TW` …) |
 
 `idle` and `followPointer` can also be changed later on the player.
@@ -463,3 +464,64 @@ npm run build          # dist/: index.js, body.js, png.js, vrm.js, tracking.js, 
 Examples: serve this repository's folder with any static server (for example `python3 -m http.server`) and open
 `/example/` (a few lines) or `/example/demo.html` (expressions, actions, microphone, camera, open a folder;
 `?model=<url>` loads another model from the same site). Both start with a featured character from `characters/`.
+
+## Recorded poses and output windows
+
+`Player` and `BodyPlayer` share `getPose()`, `onFrame`, and `renderPose()`:
+
+```js
+player.onFrame = (pose) => recording.push(pose)
+const pose = player.getPose()
+output.pause()
+output.renderPose(pose, 1 / 30, [640, 960])
+```
+
+A `PlaybackPose` contains final `params`, `move`, eased `expr` weights and `view`. Each snapshot is an independent
+copy. `renderPose` requires a paused, loaded player and does not apply idle motion, drivers or actions again. Its
+nonnegative `dt` advances the renderer's physics; optional positive integer dimensions are exact device pixels,
+including on a detached canvas. The model's watermark remains in the output. Dispose the player as usual.
+
+Face tracking accepts `deviceId` from `enumerateDevices()`. `tracking.video` is its preview element (null for a trace);
+the tracker owns the camera stream and releases it on `stop()`.
+
+Speech accepts an audio `Response` as well as URLs and bytes, so a streaming WAV need not finish downloading first.
+Optional `say(clip, { onStart, onEnd, onFail })` hooks follow audible playback; stopping settles a clip through `onFail`.
+`volume` controls playback (0..1) while preserving timing and lip sync. `level` and `vowel` expose the current mouth cues.
+
+`speech.stream` is a post-volume `MediaStream` for calls and recording: null before `unlock()`, then stable across
+clips and `stop()`. Borrow the stream without stopping its tracks; `speech.dispose()` ends them. It contains only
+this speech player's voice, excluding microphones, system speech synthesis and other audio on the page.
+
+### Live tracking profiles
+
+`@livliv-dev/player/tracking` exports `TRACKING_PARAMETERS`, `TrackingParameter`, `ParameterRule`, `TrackingProfile`, `parameterRule(key)` and `readTrackingProfile(value)`. The twelve channels are the normalized values actually produced by the face tracker, rather than raw MediaPipe blendshapes. Unsupported channels are ignored when reading saved profiles.
+
+Pass `profile` to `startFaceTracking()`, or assign `face.profile` while it runs; changing a profile does not restart the camera. Each rule maps `input: [min,max]` to `output: [min,max]`, clamps at the endpoints, applies a response `curve` (.2–3, default 1), and adds independent `smoothing` (0–1). Descending output reverses the channel. Asymmetric input/output ranges can offset the neutral position; signed curves preserve the linear mapping's zero-input result. `face.sample` gives copies of the latest input/output values, or null before the first tracking sample. Empty profiles preserve the existing tracking behavior.
+
+### Portable model files
+
+`modelFiles(source, { signal?, onProgress? })` returns the original model files as a map of paths to Blobs for project packaging. Remote folders include the manifest, referenced layer images and declared optional files. Metadata, license and watermark remain in the original manifest. Requests that fail reject the export. It uses the same 256 MiB package limit as model loading.
+
+## Rendered attachment points
+
+The local Stage candidate 0.4.0-stage.10 adds player.getAnchor('head' | 'body') to Player and BodyPlayer.
+Call it after a frame (or inside onFrame). It returns null before the current model has drawn a frame or when
+that body has no such point. The returned snapshot has x and y in canvas shares from the top left, rotation in
+clockwise radians, and scale, the rendered attachment width as a share of the canvas width. Points include the
+current action, framing and rendered body motion. VRM points use projected bones and the model's own dimensions;
+PNG points follow the picture transform. A custom Body may implement anchor(name); otherwise only its existing
+head centre is available. The points do not provide a skeleton or perspective-warp an attached image.
+
+new PngBody({ pixelated: true }) disables image filtering when enlarging pixel art. Its mutable pixelated property
+changes the next render without reloading. A host that scales the canvas in CSS or composites it must also choose
+nearest-neighbour scaling at that step.
+
+The stage.11 candidate also exports TrackingFilter from @livliv-dev/player/tracking for a host's other tracking
+inputs. Construct it with a TrackingProfile, apply a normalized Params snapshot plus elapsed seconds with
+filter.apply(params, dt), and use the returned Params in the host's driver. The same profile/sample getters and
+per-channel mapping, curves and smoothing are used by startFaceTracking. Assign profile for live changes;
+reset() forgets smoothing state and the last sample when an input disconnects or recalibrates.
+
+### Shared parameter response
+
+Player and BodyPlayer expose `parameterProfile` and `parameterSample` (also accepted by PlayerOptions). The profile uses the same ParameterRule ranges, curves, inversion and smoothing as camera profiles. It runs once after idle, pointer, drivers, speech and actions, before drawing; empty profiles preserve existing motion. The sample holds independent before/after snapshots. A successful model load resets smoothing history. `renderPose` replays already-final poses without applying the profile again, preserving output and recording fidelity.

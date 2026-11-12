@@ -1,4 +1,6 @@
-node_modules/
+node_modules
+node_modules.nosync/
+node_modules 2/
 dist/
 .DS_Store
 # your own unzipped model package, to try the examples with

@@ -1,3 +1,5 @@
+import type { AnchorName, AttachmentAnchor } from './anchors'
+export type { AnchorName, AttachmentAnchor } from './anchors'
 // @livliv-dev/player: plays a LivLiv model (an exported model package: model.json and textures/) on a canvas, outside
 // livliv.ai. The renderer is livliv.ai's own (src/runtime/puppet.ts); this wraps it in a small API: load, a frame
 // loop with the idle motion, params, expressions, actions, the corner mark the package carries, and drivers. Face
@@ -11,11 +13,13 @@ import { ZIP_LIMITS, isZip, unzip } from './zip'
 
 export { FORMAT, FORMAT_VERSION, LEGACY_FORMAT, PARAM_RANGES, defaultParams }
 export type { Labels, ModelDef, ModelMeta, Params }
+export { modelFiles } from './files'
 export { LivLivError }
-export type { ActionId, Driver, Frame, Host, LivLivErrorCode, LoadOptions, LoadProgress, PlayerOptions, View } from './base'
+export type { ParameterProfile, ParameterSample, ParameterRule } from './profile'
+export type { ActionId, Driver, Frame, Host, LivLivErrorCode, LoadOptions, LoadProgress, PlaybackPose, PlayerOptions, View } from './base'
 
 /** this package's version */
-export const VERSION = '0.3.0'
+export const VERSION = '0.4.0-stage.12'
 
 /** where a model comes from: the URL of its model.json, of the folder holding it, or of a .livliv package (relative URLs
  *  resolve against the page); a .livliv package itself (a File or Blob: a ZIP of the folder); or its files: a FileList /
@@ -147,15 +151,19 @@ export class Player extends PlayerBase<ModelInfo> {
     return this.info
   }
 
+  /** The head or torso as drawn in the last frame, including view, action and body motion. */
+  getAnchor(name: AnchorName): AttachmentAnchor | null { return this.info && !this.disposed ? this.puppet.anchor(name) : null }
+
   /** @internal */
   protected show(dt: number) {
     const p = this.puppet, f = this.frame, V = this.view
     p.view = { x: V.x, y: V.y, s: V.zoom }
     p.focusHead = V.head
-    p.move = { x: f.move.x, y: f.move.y + this.actions.y, s: f.move.s }
+    p.move = { ...f.move }
+    p.size = this.renderSize
     p.update(dt)
     p.render()
-    this.mark.draw(performance.now(), p.gl.drawingBufferWidth / Math.max(1, this.canvas.clientWidth))
+    this.mark.draw(performance.now(), this.renderSize ? 1 : p.gl.drawingBufferWidth / Math.max(1, this.canvas.clientWidth))
   }
 
   /** @internal */

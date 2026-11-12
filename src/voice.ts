@@ -5,7 +5,7 @@
 //  - createSpeech: speech clips (TTS) the player plays itself, back to back; the mouth follows each one exactly, from
 //    its loudness worked out when it is decoded and read at the moment the sound leaves the speakers
 import { VoiceMeter } from './runtime/voice'
-import { SpeechPlayer } from './runtime/speech'
+import { SpeechPlayer, type ClipHooks } from './runtime/speech'
 import { TalkMotion } from './runtime/talk'
 import type { Driver, Host } from './base'
 
@@ -27,7 +27,14 @@ export interface LipSync {
 
 export interface Speech {
   /** queues a clip (a URL, or audio bytes); it plays right after the ones before it */
-  say(clip: string | Blob | ArrayBuffer): void
+  say(clip: string | Blob | ArrayBuffer | Response, hooks?: ClipHooks): void
+  /** playback volume, 0..1; muting leaves timing and lip sync intact */
+  volume: number
+  /** current mouth openness and vowel shape, useful for a stage's audio meter */
+  readonly level: number
+  readonly vowel: number
+  /** Post-volume voice stream after unlock(); borrowed tracks stay live until dispose(). */
+  readonly stream: MediaStream | null
   /** silence now: what plays stops, what is still loading is dropped */
   stop(): void
   /** call inside a user gesture (a click, a key press) before the first say(), or browsers keep the sound blocked */
@@ -77,14 +84,21 @@ export async function startLipSync(player: Host, source?: MediaStream | HTMLMedi
 /** Speech clips with lip sync (TTS replies): say() queues each one */
 export function createSpeech(player: Host, options: LipSyncOptions = {}): Speech {
   const s = new SpeechPlayer()
+  let volume = 1
   const remove = player.use({ ...mouth(() => s.read(), () => s.vowel(), options), dispose: () => s.dispose() })
   const speech: Speech = {
-    say(clip) {
-      if (typeof clip === 'string') { s.enqueue(new URL(clip, document.baseURI).href); return }
+    say(clip, hooks) {
+      if (clip instanceof Response) { s.enqueue(clip, hooks); return }
+      if (typeof clip === 'string') { s.enqueue(new URL(clip, document.baseURI).href, hooks); return }
       const u = URL.createObjectURL(clip instanceof Blob ? clip : new Blob([clip]))
-      s.enqueue(u)
-      setTimeout(() => URL.revokeObjectURL(u), 60_000)  // fetched by then
+      const revoke = () => URL.revokeObjectURL(u)
+      s.enqueue(u, { onStart: hooks?.onStart, onEnd: () => { revoke(); hooks?.onEnd?.() }, onFail: () => { revoke(); hooks?.onFail?.() } })
     },
+    get volume() { return volume },
+    set volume(v: number) { volume = Math.max(0, Math.min(1, v)); s.setVolume(volume) },
+    get level() { return s.read() },
+    get vowel() { return s.vowel() },
+    get stream() { return s.stream },
     stop: () => s.stop(),
     unlock: () => s.unlock(),
     get busy() { return s.busy },

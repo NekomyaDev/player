@@ -1,3 +1,4 @@
+import { projectedAnchor, type AnchorName, type AttachmentAnchor } from './anchors'
 // @livliv-dev/player/vrm: a VRM (the open 3D avatar format: VRoid and others) on a BodyPlayer (@livliv-dev/player/body), drawn with
 // three.js and @pixiv/three-vrm, which the page installs (optional peer dependencies) and which load only here. The
 // shared params become its pose: the head and neck turn and tilt (angleX / Y / Z), the spine sways (bodyX / Z), the
@@ -67,6 +68,7 @@ export class VrmBody implements Body {
   private frame = { height: 1, y: 1 }
   private has = new Set<string>()
   private canvas: HTMLCanvasElement | null = null
+  private anchors: Partial<Record<AnchorName, AttachmentAnchor>> = {}
   private headAt = { x: 0.5, y: 0.25 }
   private width = 0.6
 
@@ -164,6 +166,7 @@ export class VrmBody implements Body {
 
     const old = this.vrm
     this.vrm = vrm
+    this.anchors = {}
     this.scene = scene
     this.bones = bones
     this.has = has
@@ -228,17 +231,26 @@ export class VrmBody implements Body {
     if (vrm.lookAt) { vrm.lookAt.yaw = P.eyeBallX * 25; vrm.lookAt.pitch = -P.eyeBallY * 15 }
     vrm.update(dt)
     this.renderer.render(this.scene, this.camera)
-    // where the head is now, for the pointer
-    const p = new THREE.Vector3()
-    b.head?.getWorldPosition(p)
-    p.y += 0.06
-    p.project(this.camera)
-    this.headAt = { x: (p.x + 1) / 2, y: (1 - p.y) / 2 }
+    // Project the actual posed bones, so attachments follow the same model and camera.
+    for (const name of ['head', 'body'] as const) {
+      const bone = name === 'head' ? b.head : b.chest ?? b.spine
+      if (!bone) { delete this.anchors[name]; continue }
+      const point = (x: number): [number, number] => {
+        const p = bone.localToWorld(new THREE.Vector3(x, name === 'head' ? this.frame.height * .075 : 0, 0)).project(this.camera)
+        return [(p.x + 1) / 2, (1 - p.y) / 2]
+      }
+      this.anchors[name] = projectedAnchor(point(0), point(this.frame.height * (name === 'head' ? .1 : .2) * s), h / w)
+    }
+    const head = this.anchors.head
+    if (head) this.headAt = { x: head.x, y: head.y }
   }
 
   head() { return { ...this.headAt, rx: 0.14, ry: 0.1 } }
 
+  anchor(name: AnchorName) { return this.anchors[name] ? { ...this.anchors[name] } : null }
+
   dispose() {
+    this.anchors = {}
     this.renderer?.dispose(); this.renderer = null; this.canvas = null
     const vrm = this.vrm
     this.vrm = null

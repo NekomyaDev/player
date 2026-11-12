@@ -91,6 +91,7 @@ type Pose = { x: number; y: number; z: number; px: number; py: number; pz: numbe
 
 export class FaceTracker {
   video = document.createElement('video')
+  deviceId = ''
   lm?: Landmarker
   stream?: MediaStream
   last = -1
@@ -186,7 +187,8 @@ export class FaceTracker {
     let modelReady = false
     const say = () => this.onStep?.(!modelReady ? (progress < 1 ? { step: 'download', progress } : { step: 'prepare' }) : { step: 'camera' })
     const model = loadFaceModel(() => say(), this).then((lm) => { modelReady = true; say(); return lm })
-    const camera = navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } })
+    const camera = navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user',
+      ...(this.deviceId ? { deviceId: { exact: this.deviceId } } : {}) } })
     say()
     let stream: MediaStream
     try {

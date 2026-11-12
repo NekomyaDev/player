@@ -21,7 +21,8 @@ export async function isZip(b: Blob): Promise<boolean> {
 
 /** the package's files by path (no folders, no __MACOSX / ._ / .DS_Store litter). Throws on what it cannot or must
  *  not read; a deflated keyforms.json the browser cannot inflate is left out (the character plays on the rig alone) */
-export async function unzip(zip: Blob): Promise<Map<string, Blob>> {
+export async function unzip(zip: Blob, signal?: AbortSignal): Promise<Map<string, Blob>> {
+  signal?.throwIfAborted()
   const tailLen = Math.min(zip.size, 22 + 0xffff)
   const tail = new DataView(await zip.slice(zip.size - tailLen).arrayBuffer())
   let e = -1
@@ -35,6 +36,7 @@ export async function unzip(zip: Blob): Promise<Map<string, Blob>> {
   const out = new Map<string, Blob>()
   let total = 0
   for (let o = 0, n = 0; n < count; n++) {
+    signal?.throwIfAborted()
     if (o + 46 > cd.byteLength || cd.getUint32(o, true) !== 0x02014b50) throw fail('the package is damaged (central directory)')
     const flags = cd.getUint16(o + 8, true), method = cd.getUint16(o + 10, true)
     const csize = cd.getUint32(o + 20, true), usize = cd.getUint32(o + 24, true)
@@ -67,11 +69,12 @@ export async function unzip(zip: Blob): Promise<Map<string, Blob>> {
         if (isKeyforms) { console.warn(`LivLiv: this browser cannot inflate ${name}; the character plays without it`); continue }
         throw fail(`this browser cannot open the compressed ${name} (no DecompressionStream): store it uncompressed`, 'missing-feature')
       }
-      out.set(name, await inflate(data, usize, name, type))
+      out.set(name, await inflate(data, usize, name, type, signal))
     } else {
       throw fail(`${name} uses ZIP method ${method}; a package stores its files or deflates them`)
     }
   }
+  signal?.throwIfAborted()
   return out
 }
 
@@ -84,12 +87,13 @@ function canInflate() {
 }
 
 /** a deflated entry, never past the size its directory gives (a ZIP bomb stops there) */
-async function inflate(data: Blob, size: number, name: string, type: string): Promise<Blob> {
+async function inflate(data: Blob, size: number, name: string, type: string, signal?: AbortSignal): Promise<Blob> {
   const reader = data.stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader()
   const parts: Uint8Array[] = []
   let n = 0
   try {
     for (;;) {
+      signal?.throwIfAborted()
       const { done, value } = await reader.read()
       if (done) break
       n += value.length
@@ -97,6 +101,7 @@ async function inflate(data: Blob, size: number, name: string, type: string): Pr
       parts.push(value)
     }
   } catch (e) {
+    if (signal?.aborted) { await reader.cancel(signal.reason); throw signal.reason }
     throw (e as Error).message?.startsWith(name) ? e : fail(`the package is damaged (${name}: ${(e as Error).message})`)
   }
   if (n !== size) throw fail(`the package is damaged (${name}: ${n} bytes, ${size} expected)`)

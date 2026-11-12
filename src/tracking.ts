@@ -5,6 +5,9 @@
 import { FaceTracker, LOST_AFTER, V, loadFaceModel, setFaceModelFiles, type StartStep } from './runtime/tracking'
 import { defaultParams, type Params } from './runtime/params'
 import type { Driver, Host } from './base'
+import { TrackingFilter, type TrackingProfile, type TrackingSample } from './profile'
+export { TrackingFilter, parameterRule, readTrackingProfile, TRACKING_PARAMETERS } from './profile'
+export type { ParameterRule, TrackingProfile, TrackingSample, TrackingParameter } from './profile'
 
 export type { StartStep }
 
@@ -17,10 +20,14 @@ export interface FaceModelFiles {
 }
 
 export interface FaceTrackingOptions extends FaceModelFiles {
+  /** a camera from navigator.mediaDevices.enumerateDevices(); unset uses the default camera */
+  deviceId?: string
   /** move like a mirror image (default true): turn left and the character turns to the screen's left */
   mirror?: boolean
   /** 0 (quick, shakier) .. 1 (steady, slower); default 0.5 */
   smoothing?: number
+  /** Per-parameter ranges, response curves and smoothing. Can also be changed live on the returned tracker. */
+  profile?: TrackingProfile
   /** how much leaning toward / away from the camera moves the character, 0 (default) .. 2 */
   follow?: number
   /** how many times a second to look for the face at most. 'auto' (default): as often as the camera gives a new picture,
@@ -36,6 +43,8 @@ export interface FaceTrackingOptions extends FaceModelFiles {
 }
 
 export interface FaceTracking {
+  /** the camera preview; null when playing a trace. The tracker owns its stream: stop() releases it. */
+  readonly video: HTMLVideoElement | null
   /** a face is seen now */
   readonly face: boolean
   /** faces seen per second */
@@ -43,6 +52,9 @@ export interface FaceTracking {
   /** the picture is too dark to track well */
   readonly dark: boolean
   mirror: boolean
+  profile: TrackingProfile
+  /** The latest normalized tracking values before and after this profile; null until its first frame. */
+  readonly sample: TrackingSample | null
   /** the user's current pose becomes "facing front" (it also calibrates itself on the first still second) */
   calibrate(): void
   /** camera off, the character back to its idle motion (the face model stays loaded for the next start) */
@@ -66,6 +78,7 @@ export async function preloadFaceModel(options: FaceModelFiles & { onProgress?: 
 export async function startFaceTracking(player: Host, options: FaceTrackingOptions = {}): Promise<FaceTracking> {
   files(options)
   const t = new FaceTracker()
+  t.deviceId = options.deviceId ?? ''
   t.mirror = options.mirror ?? true
   t.setSmoothing(options.smoothing ?? 0.5)
   t.maxFps = options.maxFps ?? 'auto'
@@ -73,7 +86,7 @@ export async function startFaceTracking(player: Host, options: FaceTrackingOptio
   t.onStep = options.onProgress
   t.trace = options.trace ?? ''
   await t.start()
-  const pose = defaultParams()
+  const pose = defaultParams(), filter = new TrackingFilter(options.profile)
   const follow = Math.max(0, Math.min(2, options.follow ?? 0))
   let w = 0  // how much the tracked pose shows (eases in 0.3 s after a face appears, out 0.5 s after it is lost)
   const driver: Driver = {
@@ -87,8 +100,8 @@ export async function startFaceTracking(player: Host, options: FaceTrackingOptio
       f.tracked = true
       const k = w * w * (3 - 2 * w)
       if (!k) return
-      const P = f.params
-      for (const key of Object.keys(t.target) as (keyof Params)[]) P[key] += (pose[key] - P[key]) * k
+      const P = f.params, adjusted = filter.apply(pose, f.dt)
+      for (const key of Object.keys(t.target) as (keyof Params)[]) P[key] += (adjusted[key] - P[key]) * k
       // leaning moves the picture: 10 cm sideways 6% of it, 10 cm closer 12% bigger (at follow 1)
       const d = t.pos, c = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
       f.move.x += c(d.x * 0.006 * follow * k, -0.15, 0.15)
@@ -99,9 +112,13 @@ export async function startFaceTracking(player: Host, options: FaceTrackingOptio
   }
   const remove = player.use(driver)
   return {
+    get video() { return options.trace ? null : t.video },
     get face() { return t.lostFor < LOST_AFTER },
     get fps() { return t.fps },
     get dark() { return t.dark },
+    get profile() { return filter.profile },
+    set profile(value: TrackingProfile) { filter.profile = value },
+    get sample() { return filter.sample },
     get mirror() { return t.mirror },
     set mirror(on: boolean) { t.setMirror(on) },
     calibrate: () => t.calibrate(),

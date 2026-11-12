@@ -1,3 +1,4 @@
+import { projectedAnchor, type AnchorName, type AttachmentAnchor } from '../anchors'
 // LivLiv puppet runtime: loads a LivLiv model (layers + anchors: format.ts reads model.json, v4 `livliv-model` or v3
 // `livemaker-puppet`) and animates it with an automatic rig. WebGL2, no dependencies.
 //
@@ -334,6 +335,7 @@ export class Puppet {
   gl: WebGL2RenderingContext
   canvas: HTMLCanvasElement
   model!: ModelDef
+  private anchorModel: ModelDef | null = null
   layers: GLLayer[] = []
   byId = new Map<string, GLLayer>()
   params: Params = defaultParams()
@@ -708,6 +710,7 @@ export class Puppet {
   }
 
   dispose() {
+    this.anchorModel = null
     this.freeLayers(this.layers)
     this.freeMask()
     this.layers = []
@@ -1575,6 +1578,7 @@ export class Puppet {
     this.drawMasks(w, h, sx, sy, ox, oy)
     clear()
     this.lastView = [sx, sy, ox, oy, w, h]
+    this.anchorModel = this.model
     const P = this.params
     const drawMouth = (L: GLLayer) => {
       // one frame, opaque (stepMouth switches them); within a frame the opening keeps moving a little:
@@ -1708,6 +1712,26 @@ export class Puppet {
     if (deferred) drawMouth(deferred)
     if (!newBrows) drawNewBrows()
     gl.bindVertexArray(null)
+  }
+
+  /** An attachment follows the same deformations and projection as the last rendered frame. */
+  anchor(name: AnchorName): AttachmentAnchor | null {
+    if (!this.model || this.anchorModel !== this.model) return null
+    const A = this.model.anchors, P = this.params, h = A.head
+    const x = name === 'head' ? h.cx : A.chest?.cx ?? h.cx
+    const y = name === 'head' ? h.cy : A.chest?.cy ?? (A.neck_y + A.bottom_y) / 2
+    const radius = name === 'head' ? h.rx : h.rx * 1.5
+    const neck: [number, number] = [0, 0]
+    if (name === 'head') this.bodyOffset(h.cx, A.neck_y, P, neck)
+    const point = (x: number): [number, number] => {
+      const out: [number, number] = [0, 0]
+      if (name === 'head') { this.headXform(x, y, 0, P, out); out[0] += neck[0]; out[1] += neck[1] }
+      else { this.bodyOffset(x, y, P, out); out[0] += x; out[1] += y }
+      const [sx, sy, ox, oy] = this.lastView
+      return [(out[0] * sx + ox + 1) / 2, (out[1] * sy + oy + 1) / 2]
+    }
+    const [, , , , w, height] = this.lastView
+    return projectedAnchor(point(x), point(x + radius), height / w)
   }
 
   /** a point on the canvas (CSS px from its top-left) in model px, as the last frame drew it */
