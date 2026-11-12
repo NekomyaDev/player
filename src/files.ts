@@ -1,4 +1,4 @@
-import { LivLivError } from './errors'
+import { LivLivError, type LivLivErrorCode } from './errors'
 import { readModel } from './runtime/format'
 import { isZip, unzip, ZIP_LIMITS } from './zip'
 import type { LoadOptions } from './base'
@@ -11,6 +11,16 @@ const pathOf = (path: string) => {
   return value
 }
 
+/** model.json read as the player reads it, its errors as a LivLivError */
+function manifestOf(text: string) {
+  try {
+    return readModel(JSON.parse(text))
+  } catch (e) {
+    const err = e as Error & { code?: LivLivErrorCode }
+    throw new LivLivError(e instanceof SyntaxError ? 'not-a-model' : err.code ?? 'invalid', `LivLiv: ${e instanceof SyntaxError ? 'model.json is not JSON' : err.message}`, { cause: e })
+  }
+}
+
 /** Original model files for a portable project. Keeps the manifest, metadata and watermark unchanged.
  * A remote folder includes all declared textures and optional files; a failed fetch rejects the export. */
 export async function modelFiles(source: ModelSource, options: Pick<LoadOptions, 'signal' | 'onProgress'> = {}): Promise<Map<string, Blob>> {
@@ -18,8 +28,11 @@ export async function modelFiles(source: ModelSource, options: Pick<LoadOptions,
   signal?.throwIfAborted()
   let total = 0
   const read = async (url: URL, limit = ZIP_LIMITS.bytes) => {
-    const r = await fetch(url, { signal })
-    if (!r.ok) throw new LivLivError('http', `LivLiv: model file request failed (HTTP ${r.status})`)
+    const r = await fetch(url, { signal }).catch((e) => {
+      if (signal?.aborted || (e as Error)?.name === 'AbortError') throw e
+      throw new LivLivError('unreachable', `LivLiv: could not load ${url.pathname}: unreachable, or on another origin that sends no CORS header`, { cause: e })
+    })
+    if (!r.ok) throw new LivLivError('http', `LivLiv: model file request failed (HTTP ${r.status})`, { status: r.status })
     const reader = r.body?.getReader(), chunks: Uint8Array<ArrayBuffer>[] = []
     if (!reader) {
       const blob = await r.blob()
@@ -44,7 +57,7 @@ export async function modelFiles(source: ModelSource, options: Pick<LoadOptions,
     const url = new URL(String(source), typeof document === 'undefined' ? undefined : document.baseURI)
     if (/\.(livliv|zip)$/i.test(url.pathname)) return modelFiles(await read(url), options)
     if (!url.pathname.endsWith('.json')) url.pathname = url.pathname.replace(/\/?$/, '/') + 'model.json'
-    const manifest = await read(url, ZIP_LIMITS.modelJson), model = readModel(JSON.parse(await manifest.text()))
+    const manifest = await read(url, ZIP_LIMITS.modelJson), model = manifestOf(await manifest.text())
     const paths = new Set<string>()
     for (const layer of model.layers) for (const p of [layer.texture, ...(layer.frames ?? []), layer.mask, layer.talk, layer.brow_tex]) {
       if (p) paths.add(pathOf(layer.webp ? p.replace(/\.png$/, '.webp') : p))
