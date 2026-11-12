@@ -1,10 +1,48 @@
 # Changelog
 
-## Next
+## 0.4.0
 
-The featured characters are not in the npm package, so nothing here needs a new version.
+Ways to record a character and show it in more than one place, and two changes to what a character does: the chest
+spring is off, and full-body characters wait for a later version. A page written for 0.3 needs no change.
 
-- 17 of the 21 featured characters rebuilt, as livliv.ai now shows them, and their covers redrawn.
+### New
+
+- Recorded poses: `getPose()`, `onFrame` and `renderPose(pose, dt, size)` on `Player` and `BodyPlayer`, to keep each
+  frame's pose and draw it again, in another window or at a video's exact size. See [API.md](API.md#recorded-poses).
+- `renderWhenHidden`: keep drawing while the canvas is out of view, for a live output or a recording.
+- Response profiles, which reshape params one by one (range, curve, smoothing): `parameterProfile` and
+  `parameterSample` on both players, `profile` and `sample` on face tracking, and `TrackingFilter`,
+  `readTrackingProfile()`, `parameterRule()` and `TRACKING_PARAMETERS` from `@livliv-dev/player/tracking`. See
+  [API.md](API.md#response-profiles).
+- `getAnchor('head' | 'body')`: where the head and the torso were drawn, to attach things that follow the character. A
+  `Body` of your own can give its own with `anchor()`.
+- Face tracking: `deviceId` picks the camera, and `tracking.video` is its preview.
+- Speech: `say()` takes a fetch `Response`, played as it streams in, and hooks (`onStart`, then `onEnd` or `onFail`);
+  `volume`, `level`, `vowel`, and `stream`, the voice as a `MediaStream` for a call or a recording.
+- `modelFiles()`: a model's own files, to save or package a character with a project.
+- `new PngBody({ pixelated: true })`, for pixel art.
+
+### Changed
+
+- **The chest spring is off**, as on livliv.ai: the player ignores a saved `rig.body.bust`, so packages exported before
+  keep still there too, and the featured characters now say 0. Breathing stays. At rest a character draws as in 0.3, to
+  the pixel; the difference shows only on characters that had it, around the chest, while they breathe and move.
+- **Full-body characters**, livliv.ai's newer kind (`anchors.body` in `model.json`), are refused with
+  `missing-feature`: this version would show the whole tall canvas with the feet sliding. A later version plays them,
+  and a `PlaybackPose` already has room for their moves (`crouch`, `dip`, `talk`, unused here).
+
+### Fixed
+
+- The expressions' `label` and `labels` keep their types on both players (#8).
+- A streamed WAV plays at its own sample rate (#6).
+- Face tracking tilts the head the same way as the face (#5).
+
+### Featured characters
+
+They are not in the npm package.
+
+- 17 of the 21 rebuilt, as livliv.ai now shows them, and their covers redrawn.
+- `rig.body.bust` is 0 in all of them.
 
 ## 0.3.0
 

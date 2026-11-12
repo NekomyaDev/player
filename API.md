@@ -48,6 +48,11 @@ load, as they are ([FORMAT-v3.md](FORMAT-v3.md)).
 - **No server at all** (a file the user picks, a drag and drop): pass the `.livliv` file, or a folder's files, instead
   of a URL, see `load()`.
 
+`modelFiles(source, { signal, onProgress })` gives a model's own files, a `Map` of path → `Blob`, to save a character
+with a project or package it again. From a URL it reads `model.json` as `load()` does (a model `load()` refuses is
+refused) and fetches every image and file it names, rejecting if one does not come; a package or files you pass come
+back unpacked, as they are. `model.json` is unchanged, with its licence and its mark, and the limits are `load()`'s.
+
 ## Player
 
 ```ts
@@ -60,10 +65,11 @@ new Player(canvas: HTMLCanvasElement, options?: PlayerOptions)
 | `followPointer` | `'page'` | follows the pointer anywhere on the page, only over the canvas (`'canvas'`), or not (`false`): the eyes lead and the head turns a little (about 13° at most), the brows lift when it comes near or moves fast, a soft look and now and then a smile while it rests on the face, and the character looks back at the viewer when it rests elsewhere or leaves |
 | `maxPixelRatio` | `2` | drawing-buffer pixels per CSS pixel at most; `1` saves power on high-DPI screens |
 | `autoplay` | `true` | start the frame loop at once |
-| `renderWhenHidden` | `false` | continue drivers, drawing and `onFrame` outside the viewport for live output; browser background throttling still applies |
+| `renderWhenHidden` | `false` | keep drawing (and calling `onFrame`) while the canvas is out of view, for a live output or a recording; the browser still slows a tab in the background |
+| `parameterProfile` | none | a response profile for the final pose, see [Response profiles](#response-profiles) |
 | `lang` | the browser's | the language `expressions[].label` is picked in (a BCP 47 tag: `en`, `ja`, `zh-TW` …) |
 
-`idle` and `followPointer` can also be changed later on the player.
+`idle`, `followPointer`, `renderWhenHidden` and `parameterProfile` can also be changed later on the player.
 
 `new Player()` throws where WebGL2 cannot start: the browser has none or has it turned off, or the canvas already draws
 in 2D. `Player.isSupported()` asks first, so a page can say so or show a picture instead.
@@ -126,7 +132,7 @@ try {
 | `invalid` | a model, but something in it is wrong or damaged |
 | `too-large` | over this player's limits, or the GPU's memory |
 | `newer-format` | written for a newer player |
-| `missing-feature` | needs something this page or player does not have |
+| `missing-feature` | needs something this page or player does not have (a full-body character: they come in a later version) |
 | `missing-file` | a file it names is not among the files |
 | `context-lost` | the canvas's WebGL context is gone, see [below](#when-the-context-is-lost) |
 | `released` | the canvas gave its context up with `dispose({ release: true })`: use a new canvas |
@@ -180,10 +186,12 @@ not a number counts as the default.
 
 - `view`: `{ x, y, zoom, head }`. `x`, `y` move the character by shares of the canvas (y up), `zoom` scales it about the
   center, `head: true` frames the head instead of the whole drawing (avatars, chat bubbles).
-- `play()`, `pause()`, `playing`. The loop also skips drawing while the canvas is scrolled out of view.
+- `play()`, `pause()`, `playing`. The loop also skips drawing while the canvas is scrolled out of view (unless `renderWhenHidden`).
 - `resize()`: draws now at the canvas's current size. Only needed after resizing a paused player.
 - `maxPixelRatio`: as the option, and it can be changed at any time.
 - `snapshot()`: the pose as it is now, as a PNG data URL (with the mark).
+- `getPose()`, `onFrame`, `renderPose()`: the pose as drawn, to record it or show it again, see [Recorded poses](#recorded-poses).
+- `getAnchor('head' | 'body')`: where the head or the torso was drawn, see [Attachment points](#attachment-points).
 - `canvasToModel(x, y)`: a point on the canvas (CSS px from its top left) in the model's own px, as the last frame drew it.
 - `poke(x, y, strength = 1)`: a flick at a point in the model's px: the swinging pieces near it are thrown (a tap on a twin
   tail). Returns how many it moved: none on a model without any.
@@ -264,7 +272,7 @@ import { createSpeech, startLipSync } from '@livliv-dev/player/voice'
 // speech clips (TTS replies): played back to back, the mouth following each one exactly
 const speech = createSpeech(player)
 button.onclick = () => speech.unlock()          // once, inside a user gesture, or browsers block the sound
-speech.say('/tts/reply-1.mp3')                  // a URL, a Blob or an ArrayBuffer; queued
+speech.say('/tts/reply-1.mp3')                  // a URL, a Blob, an ArrayBuffer or a fetch Response; queued
 speech.onIdle = () => {}                        // the last clip has played
 speech.stop()                                   // silence now
 
@@ -277,6 +285,14 @@ Options for both: `motion` (0..2, default 1: how much the voice moves the head; 
 syllables, default false). `startLipSync` returns `{ level, gain, stop() }`. A stream or element you pass in stays
 yours: `stop()` leaves it playing. Browsers let an `<audio>` element be routed through Web Audio only once, so after
 `startLipSync(player, el)` that element always plays through the player's audio context (it still plays normally).
+
+A `Response` plays as it comes in: a WAV streamed from a TTS service starts before it has all arrived.
+`say(clip, { onStart, onEnd, onFail })` tells about that clip: `onStart` when it starts being heard, then once `onEnd`
+(heard to the end) or `onFail` (no sound came, its download broke off, or `stop()` dropped it). `speech.volume` (0..1)
+is the playback volume; at 0 the clip still plays on time and the mouth still moves. `speech.level` and `speech.vowel`
+are the mouth's opening and the vowel now, for a meter. `speech.stream` is the voice as it plays, after the volume, a
+`MediaStream` for a call or a recording: null before `unlock()`, then the same stream until `dispose()`, which ends it.
+It has this speech's voice only, nothing else the page plays.
 
 ## Face tracking: `@livliv-dev/player/tracking`
 
@@ -311,6 +327,7 @@ const tracking = await startFaceTracking(player).catch((e) => {
 
 | option | default | |
 |---|---|---|
+| `deviceId` | | a camera from `navigator.mediaDevices.enumerateDevices()`; without it, the default one |
 | `mirror` | `true` | move like a mirror image |
 | `smoothing` | `0.5` | 0 quick and shakier .. 1 steady and slower |
 | `follow` | `0` | how much leaning toward / away from the camera moves the character (0..2) |
@@ -319,6 +336,10 @@ const tracking = await startFaceTracking(player).catch((e) => {
 | `wasmUrl` | jsDelivr | folder with MediaPipe's `vision_wasm_internal.{js,wasm}` and the `nosimd` pair |
 | `modelUrl` | Google's bucket | `face_landmarker.task` |
 | `trace` | | play a recorded face trace (URL) or `'synth'` (a built-in 24 s loop) instead of the camera, for tests |
+| `profile` | | a response profile for the camera's values, see [Response profiles](#response-profiles) |
+
+`tracking.video` is the camera's `<video>` element, for a preview (null with a `trace`). The tracker owns its stream
+and stops it on `stop()`: show the element, don't stop its tracks.
 
 By default the wasm comes from jsDelivr (`@mediapipe/tasks-vision@1.1.1/wasm`) and the model from Google's
 `mediapipe-models` bucket. In production, host those files yourself and pass `wasmUrl` / `modelUrl`. While no face is
@@ -390,6 +411,8 @@ await vrm.load('/avatars/me.vrm')            // a URL, a File, or files picked
   `blink-open` (any image the browser reads, 8192 px a side at most). One is shown at a time: the open one while the
   voice is loud, the blink ones when the eyes close. The picture sways, tilts and breathes with the head and body and
   hops with the voice; there are no expressions but the smile param, and no turn beyond that sway. `name.txt` names it.
+  `new PngBody({ pixelated: true })` keeps pixel art sharp when it is drawn larger (`pixelated` can be changed at any
+  time); a page that scales the canvas in CSS needs `image-rendering: pixelated` on it too.
 - **VRM** (`@livliv-dev/player/vrm`): VRM 0.x and 1.0, drawn with [three.js](https://threejs.org) and
   [three-vrm](https://github.com/pixiv/three-vrm), which you install (`npm install three @pixiv/three-vrm`; three.js 0.170
   or newer, played here on 0.170, 0.186 and 0.187 with three-vrm 3.5.5; optional peer dependencies, so the rest of the
@@ -409,7 +432,8 @@ await vrm.load('/avatars/me.vrm')            // a URL, a File, or files picked
 - **Your own**: anything with `load(files)`, `render(canvas, pose, w, h, dt)`, `head()` and `dispose()` (the `Body`
   type), and if it cares which canvas it gets, `attach(canvas)`. One that draws with WebGL can also have `context()`, returning
   its context, so that `contextLost` and `dispose({ release })` work for it. `pose` has the params after the idle motion and the
-  drivers, the picture's `move` and each expression's weight.
+  drivers, the picture's `move` and each expression's weight. `anchor(name)`, optional, gives its
+  [attachment points](#attachment-points).
 
 A failed `load()` keeps the character before, as on a Player. A canvas has one kind of context for good: a PNGTuber draws in 2D, a Player and a VRM in WebGL2, so a PNGTuber on a canvas that was a Player's (or the other way round) is refused with an error; give it its own.
 A BodyPlayer takes the same `load()` options and its errors are the same, with one difference: a Body swaps its character
@@ -449,6 +473,9 @@ drawing it wrong; a model whose `requires` names a feature this player does not 
 it does not know it ignores. Packages from before v4 (`"livemaker-puppet"`, `LEGACY_FORMAT`, version 3, or no field)
 play as they are. The rules for what changes the version: [FORMAT.md §9](FORMAT.md#9-versions-and-additions).
 
+Full-body characters, livliv.ai's newer kind (a tall canvas whose `anchors` have `body`, with the feet on a ground line),
+are refused with `missing-feature`: this player would draw them wrong, and a later version plays them.
+
 ## Browser support
 
 WebGL2 and ES2023: Chrome / Edge 97+, Firefox 104+, Safari 15.4+. Tested on current desktop Chromium, Firefox and WebKit;
@@ -465,63 +492,73 @@ Examples: serve this repository's folder with any static server (for example `py
 `/example/` (a few lines) or `/example/demo.html` (expressions, actions, microphone, camera, open a folder;
 `?model=<url>` loads another model from the same site). Both start with a featured character from `characters/`.
 
-## Recorded poses and output windows
+## Recorded poses
 
-`Player` and `BodyPlayer` share `getPose()`, `onFrame`, and `renderPose()`:
+Each frame's pose can be kept and drawn again: a recording, a second window showing the same character, a video
+rendered afterwards. `Player` and `BodyPlayer` both have:
+
+- `getPose()`: the pose of the frame drawn last.
+- `onFrame`: called after each frame with its pose.
+- `renderPose(pose, dt = 0, size?)`: draws a pose on a paused player (it throws while playing).
 
 ```js
-player.onFrame = (pose) => recording.push(pose)
-const pose = player.getPose()
-output.pause()
-output.renderPose(pose, 1 / 30, [640, 960])
+player.onFrame = (pose) => frames.push(pose)       // every frame drawn
+output.pause()                                     // another player with the same character
+output.renderPose(frames[i], 1 / 30, [1080, 1920])
 ```
 
-A `PlaybackPose` contains final `params`, `move`, eased `expr` weights and `view`. Each snapshot is an independent
-copy. `renderPose` requires a paused, loaded player and does not apply idle motion, drivers or actions again. Its
-nonnegative `dt` advances the renderer's physics; optional positive integer dimensions are exact device pixels,
-including on a detached canvas. The model's watermark remains in the output. Dispose the player as usual.
+A `PlaybackPose` is `{ params, move, expr, view }`: the final params (the idle motion, drivers, actions and the
+response profile done), the picture's `move` (`x`, `y` shares of the canvas, y up, and a scale `s`, with actions and
+the talking bob in it), each expression's weight as shown (0..1) and the view. It is a copy, safe to keep or send as
+JSON.
 
-Face tracking accepts `deviceId` from `enumerateDevices()`. `tracking.video` is its preview element (null for a trace);
-the tracker owns the camera stream and releases it on `stop()`.
+`renderPose()` runs no idle motion, driver, action or profile: the pose is drawn as it was, kept in the params' ranges.
+`dt` (seconds) moves the hair and the other springs on, so frames drawn one after another swing as they did live.
+`size`, `[width, height]` in device pixels, draws at exactly that size, on a canvas that is not in the page too. The
+player takes the pose's view, the mark stays, and `resize()` and `snapshot()` draw the same pose again until `play()`.
+Before a model is loaded, after `dispose()` or once the context is lost, it draws nothing.
 
-Speech accepts an audio `Response` as well as URLs and bytes, so a streaming WAV need not finish downloading first.
-Optional `say(clip, { onStart, onEnd, onFail })` hooks follow audible playback; stopping settles a clip through `onFail`.
-`volume` controls playback (0..1) while preserving timing and lip sync. `level` and `vowel` expose the current mouth cues.
+`crouch`, `dip` and `talk` are reserved for full-body characters, which a later version plays: their feet stay on the
+ground, so a hop crouches the hips and a syllable dips the upper body instead of moving the picture. This version
+never sets them and ignores them.
 
-`speech.stream` is a post-volume `MediaStream` for calls and recording: null before `unlock()`, then stable across
-clips and `stop()`. Borrow the stream without stopping its tracks; `speech.dispose()` ends them. It contains only
-this speech player's voice, excluding microphones, system speech synthesis and other audio on the page.
+## Response profiles
 
-### Live tracking profiles
+A profile reshapes params one by one: a small head turn shown as a larger one, a mouth that is fully open at 0.7, brows
+that move less.
 
-`@livliv-dev/player/tracking` exports `TRACKING_PARAMETERS`, `TrackingParameter`, `ParameterRule`, `TrackingProfile`, `parameterRule(key)` and `readTrackingProfile(value)`. The twelve channels are the normalized values actually produced by the face tracker, rather than raw MediaPipe blendshapes. Unsupported channels are ignored when reading saved profiles.
+```js
+player.parameterProfile = {
+  angleX: { input: [-15, 15], output: [-30, 30], curve: 1, smoothing: 0.2 },
+  mouthOpen: { input: [0, 0.7], output: [0, 1], curve: 1, smoothing: 0 },
+}
+```
 
-Pass `profile` to `startFaceTracking()`, or assign `face.profile` while it runs; changing a profile does not restart the camera. Each rule maps `input: [min,max]` to `output: [min,max]`, clamps at the endpoints, applies a response `curve` (.2–3, default 1), and adds independent `smoothing` (0–1). Descending output reverses the channel. Asymmetric input/output ranges can offset the neutral position; signed curves preserve the linear mapping's zero-input result. `face.sample` gives copies of the latest input/output values, or null before the first tracking sample. Empty profiles preserve the existing tracking behavior.
+Each rule takes `input: [min, max]` (clamped there) onto `output: [min, max]`; an output from high to low reverses the
+param. `curve` (0.2..3, 1 is straight) bends it, from 0 both ways on a range that crosses 0, so 0 stays where the
+straight line puts it. `smoothing` (0 none .. 1 half a second) eases it. The twelve params a face tracker gives can
+have one (`TRACKING_PARAMETERS`): `angleX`, `angleY`, `angleZ`, `eyeLOpen`, `eyeROpen`, `eyeBallX`, `eyeBallY`,
+`browLY`, `browRY`, `mouthOpen`, `smile`, `bodyX`. An empty profile changes nothing.
 
-### Portable model files
+- `player.parameterProfile` (or the option) reshapes the final pose, after the idle motion, drivers, speech and
+  actions. `player.parameterSample` is the last frame's params before and after it (`{ input, output }`; null before
+  the first frame). A new model starts its smoothing over.
+- `startFaceTracking(player, { profile })` and `tracking.profile` reshape the camera's values only, and
+  `tracking.sample` is those before and after. Changing it does not restart the camera.
+- `TrackingFilter`, from `@livliv-dev/player/tracking`, is the same for inputs of your own (a controller, the
+  network): `new TrackingFilter(profile)`, then `filter.apply(params, dt)` returns the reshaped params; `profile`,
+  `sample`, and `reset()` when the input starts over.
+- `readTrackingProfile(value)` reads a saved one (JSON): unknown params are left out, numbers kept in range.
+  `parameterRule(key)` is a rule that changes nothing, to start from.
 
-`modelFiles(source, { signal?, onProgress? })` returns the original model files as a map of paths to Blobs for project packaging. Remote folders include the manifest, referenced layer images and declared optional files. Metadata, license and watermark remain in the original manifest. Requests that fail reject the export. It uses the same 256 MiB package limit as model loading.
+A profile is read when it is assigned, and the getters give a copy: to change one, assign a new one.
 
-## Rendered attachment points
+## Attachment points
 
-The local Stage candidate 0.4.0-stage.10 adds player.getAnchor('head' | 'body') to Player and BodyPlayer.
-Call it after a frame (or inside onFrame). It returns null before the current model has drawn a frame or when
-that body has no such point. The returned snapshot has x and y in canvas shares from the top left, rotation in
-clockwise radians, and scale, the rendered attachment width as a share of the canvas width. Points include the
-current action, framing and rendered body motion. VRM points use projected bones and the model's own dimensions;
-PNG points follow the picture transform. A custom Body may implement anchor(name); otherwise only its existing
-head centre is available. The points do not provide a skeleton or perspective-warp an attached image.
-
-new PngBody({ pixelated: true }) disables image filtering when enlarging pixel art. Its mutable pixelated property
-changes the next render without reloading. A host that scales the canvas in CSS or composites it must also choose
-nearest-neighbour scaling at that step.
-
-The stage.11 candidate also exports TrackingFilter from @livliv-dev/player/tracking for a host's other tracking
-inputs. Construct it with a TrackingProfile, apply a normalized Params snapshot plus elapsed seconds with
-filter.apply(params, dt), and use the returned Params in the host's driver. The same profile/sample getters and
-per-channel mapping, curves and smoothing are used by startFaceTracking. Assign profile for live changes;
-reset() forgets smoothing state and the last sample when an input disconnects or recalibrates.
-
-### Shared parameter response
-
-Player and BodyPlayer expose `parameterProfile` and `parameterSample` (also accepted by PlayerOptions). The profile uses the same ParameterRule ranges, curves, inversion and smoothing as camera profiles. It runs once after idle, pointer, drivers, speech and actions, before drawing; empty profiles preserve existing motion. The sample holds independent before/after snapshots. A successful model load resets smoothing history. `renderPose` replays already-final poses without applying the profile again, preserving output and recording fidelity.
+`getAnchor('head' | 'body')` says where the head or the torso was drawn in the last frame, to put something on the
+character that follows it (a hat, a sticker, a name tag): `{ x, y, rotation, scale }`, with `x`, `y` shares of the
+canvas from its top left, `rotation` in radians (clockwise) and `scale` a width that fits there (about the head's, or
+the shoulders' for the torso) as a share of the canvas's width. Call it after a frame, in `onFrame` for one. It is null
+before the model's first frame, and for a point a body does not have. The point moves with actions, the view and the
+body's own motion; it is a point and an angle, not a skeleton, and does not bend what you put there. A `Body` of your
+own can have `anchor(name)`; without it only `'head'` is there, from its `head()`.

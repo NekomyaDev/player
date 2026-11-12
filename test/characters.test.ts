@@ -29,7 +29,7 @@ describe('featured characters', { skip: !ids.length && 'no characters/ here' }, 
       assert.ok(raw.version <= FORMAT_VERSION)
       assert.deepEqual(raw.requires ?? [], [])
       assert.equal(raw.meta?.license?.id, { p01: 'CC-BY-NC-SA-4.0', p02: 'CC-BY-NC-SA-4.0', p03: 'LicenseRef-Third-Party-Character' }[id] ?? 'LicenseRef-LivLiv-Samples')
-      assert.equal(raw.meta?.watermark?.kind, 'livliv')  // the LivLiv logo, in the corner only (owner 11-04)
+      assert.equal(raw.meta?.watermark?.kind, 'livliv')  // the LivLiv logo, in the corner only
       assert.equal(raw.meta?.watermark?.center, false)
       for (const e of raw.expressions || []) assert.deepEqual(LANGS.filter((l) => !e.label?.[l]), [], `${e.id}'s names`)
       for (const f of Object.values(raw.files || {}) as string[]) assert.ok(existsSync(join(dir, f)), f)

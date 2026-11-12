@@ -77,7 +77,7 @@ const png = new BodyPlayer(canvasB, new PngBody())
 await png.load({ closed: 'me-closed.png', open: 'me-open.png' })
 ```
 
-API の全体は [API.md](API.md)（英語）にあります：オプション、パラメーター、表情とアクション、ドライバー、VRM と PNGTuber、信頼できないファイルの上限、モデルパッケージ、フォーマットのバージョン。LivLiv のパッケージ形式（`.livliv`、`model.json` v4）は [FORMAT.md](FORMAT.md)、JSON Schema は [`schema/`](schema/) にあります。v4 より前に書き出したパッケージは [FORMAT-v3.md](FORMAT-v3.md) のとおりで、そのまま再生できます。
+API の全体は [API.md](API.md)（英語）にあります：オプション、パラメーター、表情とアクション、ドライバー、記録したポーズと取り付け位置、VRM と PNGTuber、信頼できないファイルの上限、モデルパッケージ、フォーマットのバージョン。LivLiv のパッケージ形式（`.livliv`、`model.json` v4）は [FORMAT.md](FORMAT.md)、JSON Schema は [`schema/`](schema/) にあります。v4 より前に書き出したパッケージは [FORMAT-v3.md](FORMAT-v3.md) のとおりで、そのまま再生できます。
 
 > npm パッケージに入っているのはプレイヤーだけです。厳選キャラクターはこのリポジトリの [`characters/`](characters/) にあります。使うキャラクターをライセンスと一緒にページのそばにコピーしてください。
 
@@ -97,7 +97,7 @@ PNGTuber の画像や VRM（three.js で描画）を読み込めます。[livliv
 
 - **PNGTuber**：2 枚の画像（口を閉じた絵、開いた絵）。目を閉じた 2 枚もあればなお良いです。
 - **VRM**：VRoid Studio など、VRM 0.x / 1.0 を書き出せるツールで作ったもの。
-- **LivLiv のモデル**：[livliv.ai](https://livliv.ai) で 1 枚の絵からキャラクターを作り、キャラクターページから**モデルパッケージ**（`.livliv` ファイル）をダウンロードします。そのまま `load()` に渡せます（URL、または選んでもらった `File`）。展開したフォルダでも構いません。無料プランのパッケージには LivLiv のマークが入っていて、プレイヤーがそれを描きます。
+- **LivLiv のモデル**：[livliv.ai](https://livliv.ai) で 1 枚の絵からキャラクターを作り、キャラクターページから**モデルパッケージ**（`.livliv` ファイル）をダウンロードします。そのまま `load()` に渡せます（URL、または選んでもらった `File`）。展開したフォルダでも構いません。無料プランのパッケージには LivLiv のマークが入っていて、プレイヤーがそれを描きます。全身のキャラクターはプレイヤーの今後のバージョンで対応します。
 
 ## プレイヤーとキャラクターについて
 

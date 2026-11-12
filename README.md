@@ -79,8 +79,8 @@ const png = new BodyPlayer(canvasB, new PngBody())
 await png.load({ closed: 'me-closed.png', open: 'me-open.png' })
 ```
 
-The whole API is in [API.md](API.md): options, params, expressions and actions, drivers, VRM and PNGTuber characters,
-the limits on untrusted files, the model package and the format version. The LivLiv package format (`.livliv`,
+The whole API is in [API.md](API.md): options, params, expressions and actions, drivers, recorded poses and attachment
+points, VRM and PNGTuber characters, the limits on untrusted files, the model package and the format version. The LivLiv package format (`.livliv`,
 `model.json` v4) is in [FORMAT.md](FORMAT.md), with a JSON Schema in [`schema/`](schema/); packages exported before v4
 are described in [FORMAT-v3.md](FORMAT-v3.md) and still play.
 
@@ -121,6 +121,7 @@ picture on [livliv.ai](https://livliv.ai).
 - **A LivLiv model**: make one from a picture on [livliv.ai](https://livliv.ai), then download its model package from
   the character's page (**Model package**): a `.livliv` file. Pass it to `load()` as it is (a URL, or the `File`
   someone picked), or unzipped as a folder. Packages on the free plan carry the LivLiv mark, and the player draws it.
+  Full-body characters come in a later version of the player.
 
 ## About the player and the characters
 

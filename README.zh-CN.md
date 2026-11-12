@@ -79,7 +79,7 @@ const png = new BodyPlayer(canvasB, new PngBody())
 await png.load({ closed: 'me-closed.png', open: 'me-open.png' })
 ```
 
-完整的 API 见 [API.md](API.md)（英文）：选项、参数、表情和动作、驱动、VRM 和 PNGTuber、不可信文件的上限、模型包和格式版本。LivLiv 模型包格式（`.livliv`、`model.json` v4）见 [FORMAT.md](FORMAT.md)，JSON Schema 在 [`schema/`](schema/)；v4 之前导出的模型包见 [FORMAT-v3.md](FORMAT-v3.md)，照样能播放。
+完整的 API 见 [API.md](API.md)（英文）：选项、参数、表情和动作、驱动、录下的姿态和挂点、VRM 和 PNGTuber、不可信文件的上限、模型包和格式版本。LivLiv 模型包格式（`.livliv`、`model.json` v4）见 [FORMAT.md](FORMAT.md)，JSON Schema 在 [`schema/`](schema/)；v4 之前导出的模型包见 [FORMAT-v3.md](FORMAT-v3.md)，照样能播放。
 
 > npm 包里只有播放器。精选角色在这个仓库的 [`characters/`](characters/) 里，把要用的角色连同许可一起复制到你的页面旁边。
 
@@ -99,7 +99,7 @@ Kujira、Kujira Q 和 Pen 来自别人的作品，不适用上面的许可和署
 
 - **PNGTuber**：两张图（闭嘴、张嘴），有闭眼的两张更好。
 - **VRM**：VRoid Studio 或任何能导出 VRM 0.x / 1.0 的工具做的。
-- **LivLiv 模型**：在 [livliv.ai](https://livliv.ai) 用一张图做出角色，在角色页下载**模型包**（一个 `.livliv` 文件），直接传给 `load()`（URL，或用户选的 `File`），解压后的文件夹也可以。免费版的模型包带 LivLiv 水印，播放器会画出来。
+- **LivLiv 模型**：在 [livliv.ai](https://livliv.ai) 用一张图做出角色，在角色页下载**模型包**（一个 `.livliv` 文件），直接传给 `load()`（URL，或用户选的 `File`），解压后的文件夹也可以。免费版的模型包带 LivLiv 水印，播放器会画出来。全身角色要等播放器的后续版本。
 
 ## 关于播放器和角色
 

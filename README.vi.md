@@ -79,7 +79,7 @@ const png = new BodyPlayer(canvasB, new PngBody())
 await png.load({ closed: 'me-closed.png', open: 'me-open.png' })
 ```
 
-Toàn bộ API có trong [API.md](API.md) (tiếng Anh): các tùy chọn, tham số, biểu cảm và hành động, driver, nhân vật VRM và PNGTuber,
+Toàn bộ API có trong [API.md](API.md) (tiếng Anh): các tùy chọn, tham số, biểu cảm và hành động, driver, tư thế đã ghi và điểm gắn, nhân vật VRM và PNGTuber,
 giới hạn khi đọc file không đáng tin cậy, gói model và phiên bản định dạng. Định dạng gói LivLiv (`.livliv`,
 `model.json` v4) có trong [FORMAT.md](FORMAT.md), kèm JSON Schema trong [`schema/`](schema/); các gói xuất trước v4
 được mô tả trong [FORMAT-v3.md](FORMAT-v3.md) và vẫn phát được.
@@ -121,6 +121,7 @@ Bạn có thể đưa vào ảnh của một PNGTuber, hoặc một VRM (vẽ b�
 - **Một model LivLiv**: tạo một model từ một ảnh trên [livliv.ai](https://livliv.ai), rồi tải gói model từ
   trang của nhân vật đó (**Model package**): một file `.livliv`. Đưa file đó vào `load()` nguyên như vậy (một URL, hoặc `File`
   người dùng đã chọn), hoặc giải nén thành thư mục. Gói model thuộc tài khoản miễn phí (free plan) sẽ mang dấu LivLiv, và trình phát sẽ vẽ dấu đó.
+  Nhân vật toàn thân sẽ được hỗ trợ trong một phiên bản sau của trình phát.
 
 ## Về trình phát và các nhân vật
 
