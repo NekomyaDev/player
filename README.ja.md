@@ -17,6 +17,7 @@
 - WebGL2、依存なし、コアは gzip で約 30 KB
 - リップシンク（マイク、音声、動画）と Web カメラのフェイストラッキング（MediaPipe）はブラウザ内で動作し、必要なときだけ読み込めます
 - LivLiv・VRM・PNGTuber のキャラクターを同じ API で再生
+- 全身のキャラクターは足を地面に着けたまま、揺れ、しゃがみ、話すと上半身が沈みます。表示範囲も選べます
 - [`characters/`](characters/) に厳選キャラクター 25 体。すぐに使えます
 
 ## 試してみる
@@ -81,13 +82,25 @@ API の全体は [API.md](API.md)（英語）にあります：オプション�
 
 > npm パッケージに入っているのはプレイヤーだけです。厳選キャラクターはこのリポジトリの [`characters/`](characters/) にあります。使うキャラクターをライセンスと一緒にページのそばにコピーしてください。
 
+## 全身のキャラクター
+
+<p align="center"><img src="media/full-body.webp" alt="Tsubaki、Neve、Juno、Viola：全身の厳選キャラクター 4 体" width="560"></p>
+
+全身のキャラクターは頭から足まで描かれ、地面に立っています。上半身は半身のキャラクターと同じように動き、体全体は足首を支点に揺れ、腰は重心を移し、スカートの裾は少し遅れてついてきます。ジャンプの前やカメラに身を乗り出したときは、足はそのままで膝を曲げてしゃがみます。表示範囲は `view.fit` で選べます。
+
+```js
+player.view.fit = 'whole'   // 'frame'（頭と胸まで、既定）、'knee'（膝まで）、'whole'（全身）
+```
+
+ドライバーは `frame.grounded` を読み、`frame.talk` で上半身を沈ませられます。記録したポーズにはしゃがみと沈みも残ります。詳しくは API.md の [Full-body characters](API.md#full-body-characters) をご覧ください。
+
 ## 厳選キャラクター
 
-`characters/` には 25 体のキャラクターが入っていて、そのまま `load()` できます（f05〜f08 の 4 体は全身）。右下に小さな LivLiv のマークが入っていて、プレイヤーがそれを描きます。これらには Apache License は**適用されません**。大半は LivLiv が制作したもので、個人の非商用利用は、クレジット（「キャラクター：LivLiv（livliv.ai）」）を入れれば無料です。販売、商用利用、AI モデルの学習には使えません。Nana は LivLiv のマスコットです。条文は [characters/LICENSE.md](characters/LICENSE.md) をご覧ください。
+`characters/` には 25 体のキャラクターが入っていて、そのまま `load()` できます（f05〜f08 の 4 体は全身）。これらには Apache License は**適用されません**。大半は LivLiv が制作したもので、個人の非商用利用は、クレジット（「キャラクター：LivLiv（livliv.ai）」）を入れれば無料です。販売、商用利用、AI モデルの学習には使えません。Nana は LivLiv のマスコットです。条文は [characters/LICENSE.md](characters/LICENSE.md) をご覧ください。
 
 Kujira、Kujira Q、Pen は他の方の作品に基づくもので、上記のライセンスとクレジットは適用されません。出典、クレジット、条件は [characters/CREDITS.md](characters/CREDITS.md) をご覧ください。
 
-各キャラクターには `cover.webp`（512 x 768、約 50 KB）もあります。最初のフレームで、マークは入っていません。`player.load(source, { poster })` を使うと、最初のフレームが出るまでキャンバスに表示されます。スクリプトが動く前から絵を出したいときは、キャンバスの下に `object-fit: contain` で置き、準備ができたらキャラクターをフェードインさせます（[example/loading.js](example/loading.js) がこの方法です）。
+各キャラクターには `cover.webp`（512 x 768、約 50 KB。全身のキャラクターは全身が入った 512 x 1024）もあります。最初のフレームです。`player.load(source, { poster })` を使うと、最初のフレームが出るまでキャンバスに表示されます。スクリプトが動く前から絵を出したいときは、キャンバスの下に `object-fit: contain` で置き、準備ができたらキャラクターをフェードインさせます（[example/loading.js](example/loading.js) がこの方法です）。
 
 キャラクターの一覧は[英語の README](README.md#featured-characters) にあります。
 
@@ -97,7 +110,7 @@ PNGTuber の画像や VRM（three.js で描画）を読み込めます。[livliv
 
 - **PNGTuber**：2 枚の画像（口を閉じた絵、開いた絵）。目を閉じた 2 枚もあればなお良いです。
 - **VRM**：VRoid Studio など、VRM 0.x / 1.0 を書き出せるツールで作ったもの。
-- **LivLiv のモデル**：[livliv.ai](https://livliv.ai) で 1 枚の絵からキャラクターを作り、キャラクターページから**モデルパッケージ**（`.livliv` ファイル）をダウンロードします。そのまま `load()` に渡せます（URL、または選んでもらった `File`）。展開したフォルダでも構いません。無料プランのパッケージには LivLiv のマークが入っていて、プレイヤーがそれを描きます。全身のキャラクターも再生できます（0.5 から）。足は地面に着いたままです。livliv.ai ではまだ全身キャラクターのパッケージを提供していません。
+- **LivLiv のモデル**：[livliv.ai](https://livliv.ai) で 1 枚の絵からキャラクターを作り、キャラクターページから**モデルパッケージ**（`.livliv` ファイル）をダウンロードします。そのまま `load()` に渡せます（URL、または選んでもらった `File`）。展開したフォルダでも構いません。全身のキャラクターも再生できます（0.5 から）。livliv.ai ではまだ全身キャラクターのパッケージを提供していません。
 
 ## プレイヤーとキャラクターについて
 

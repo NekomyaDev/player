@@ -17,6 +17,7 @@
 - WebGL2, không phụ thuộc thư viện ngoài, lõi chỉ khoảng 30 KB sau khi nén gzip
 - Đồng bộ môi (microphone, audio, video) và theo dõi khuôn mặt qua webcam (MediaPipe), đều chạy trong trình duyệt, chỉ được tải khi bạn cần
 - Phát nhân vật LivLiv, VRM và PNGTuber qua cùng một API
+- Nhân vật toàn thân đứng trên mặt đất: lắc lư, khuỵu gối và nhún phần thân trên khi nói mà chân vẫn giữ nguyên, với khung hình bạn chọn
 - 25 nhân vật nổi bật trong [`characters/`](characters/), sẵn sàng dùng
 
 ## Thử ngay
@@ -87,17 +88,31 @@ giới hạn khi đọc file không đáng tin cậy, gói model và phiên bả
 > Gói npm chỉ có trình phát. Các nhân vật nổi bật nằm trong [`characters/`](characters/) của repository này: hãy sao chép
 > những nhân vật bạn dùng, kèm giấy phép, vào cạnh trang của bạn.
 
+## Nhân vật toàn thân
+
+<p align="center"><img src="media/full-body.webp" alt="Tsubaki, Neve, Juno và Viola, bốn nhân vật nổi bật toàn thân" width="560"></p>
+
+Nhân vật toàn thân được vẽ từ đầu đến chân và đứng trên mặt đất. Phần thân trên cử động như nhân vật nửa người; cả
+cơ thể lắc lư quanh mắt cá chân, hông dịch trọng tâm, vạt váy chuyển động theo sau, và khi nhảy hoặc nghiêng về phía
+camera thì nhân vật khuỵu gối trong khi chân vẫn đứng yên. Chọn khung hình bằng `view.fit`:
+
+```js
+player.view.fit = 'whole'   // 'frame' (đầu và ngực, mặc định), 'knee' (đến đầu gối) hoặc 'whole' (toàn thân)
+```
+
+Driver đọc được `frame.grounded` và có thể nhún phần thân trên bằng `frame.talk`; tư thế được ghi lại vẫn giữ độ khuỵu
+và độ nhún: xem [Full-body characters](API.md#full-body-characters) trong API.md.
+
 ## Nhân vật nổi bật
 
-`characters/` có 25 nhân vật, sẵn sàng để `load()`; 4 nhân vật f05–f08 là nhân vật toàn thân. Các nhân vật mang một dấu LivLiv nhỏ ở góc dưới bên phải, do
-trình phát vẽ lên. Các nhân vật này **không** thuộc phạm vi Giấy phép Apache. Hầu hết do LivLiv tạo ra: bạn được dùng miễn phí cho dự án cá nhân, phi thương mại kèm ghi công
+`characters/` có 25 nhân vật, sẵn sàng để `load()`; 4 nhân vật f05–f08 là nhân vật toàn thân. Các nhân vật này **không** thuộc phạm vi Giấy phép Apache. Hầu hết do LivLiv tạo ra: bạn được dùng miễn phí cho dự án cá nhân, phi thương mại kèm ghi công
 ("Characters: LivLiv (livliv.ai)"); không được bán, dùng thương mại hay dùng các nhân vật này để huấn luyện mô hình AI. Nana là
 linh vật của LivLiv. Điều khoản có trong [characters/LICENSE.md](characters/LICENSE.md).
 
 Kujira, Kujira Q và Pen dựa trên tác phẩm của người khác: giấy phép và cách ghi công nêu trên không áp dụng cho các nhân vật này. Nguồn,
 ghi công và điều khoản của các nhân vật này có trong [characters/CREDITS.md](characters/CREDITS.md).
 
-Mỗi nhân vật còn có một `cover.webp` (512 x 768, khoảng 50 KB), là khung hình đầu tiên của nhân vật, không kèm dấu. `player.load(source, { poster })`
+Mỗi nhân vật còn có một `cover.webp` (512 x 768, khoảng 50 KB; với nhân vật toàn thân là 512 x 1024, cả người), là khung hình đầu tiên của nhân vật. `player.load(source, { poster })`
 hiện ảnh này trên canvas cho đến khung hình đầu tiên. Muốn có ảnh trước khi script chạy, hãy đặt ảnh này phía sau canvas với
 `object-fit: contain` rồi cho nhân vật hiện dần lên trên nó, như [example/loading.js](example/loading.js) đã làm.
 
@@ -110,6 +125,8 @@ hiện ảnh này trên canvas cho đến khung hình đầu tiên. Muốn có �
 | `s01` | Hana | `p01` | Kujira | `v06` | Usa |
 | `q02` | Mochi | `p02` | Kujira Q | `v07` | Stella |
 | `q03` | Kotaro | `p03` | Pen | `w01` | Max |
+| `f05` | Tsubaki (toàn thân) | `f06` | Neve (toàn thân) | `f07` | Juno (toàn thân) |
+| `f08` | Viola (toàn thân) | | | | |
 
 ## Nhân vật của riêng bạn
 
@@ -120,8 +137,8 @@ Bạn có thể đưa vào ảnh của một PNGTuber, hoặc một VRM (vẽ b�
 - **Một VRM**: từ VRoid Studio hoặc bất kỳ công cụ nào xuất VRM 0.x hay 1.0.
 - **Một model LivLiv**: tạo một model từ một ảnh trên [livliv.ai](https://livliv.ai), rồi tải gói model từ
   trang của nhân vật đó (**Model package**): một file `.livliv`. Đưa file đó vào `load()` nguyên như vậy (một URL, hoặc `File`
-  người dùng đã chọn), hoặc giải nén thành thư mục. Gói model thuộc tài khoản miễn phí (free plan) sẽ mang dấu LivLiv, và trình phát sẽ vẽ dấu đó.
-  Nhân vật toàn thân cũng phát được (từ 0.5), chân luôn đứng trên mặt đất; livliv.ai hiện chưa cung cấp gói mô hình của nhân vật toàn thân.
+  người dùng đã chọn), hoặc giải nén thành thư mục. Nhân vật toàn thân cũng phát được (từ 0.5); livliv.ai hiện chưa cung cấp gói mô hình của
+  nhân vật toàn thân.
 
 ## Về trình phát và các nhân vật
 

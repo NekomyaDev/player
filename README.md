@@ -17,6 +17,7 @@
 - WebGL2, no dependencies, about 30 KB gzipped for the core
 - Lip sync (microphone, audio, video) and webcam face tracking (MediaPipe), both in the browser, imported only when you need them
 - Plays LivLiv, VRM and PNGTuber characters through the same API
+- Full-body characters stand on the ground: they sway, crouch and dip with their feet in place, in the shot you pick
 - 25 featured characters in [`characters/`](characters/), ready to use
 
 ## Try it
@@ -87,17 +88,33 @@ are described in [FORMAT-v3.md](FORMAT-v3.md) and still play.
 > The npm package is the player alone. The featured characters are in this repository's [`characters/`](characters/): copy
 > the ones you use next to your page, with their licence.
 
+## Full-body characters
+
+<p align="center"><img src="media/full-body.webp" alt="Tsubaki, Neve, Juno and Viola, four full-body featured characters" width="560"></p>
+
+A full-body character is drawn head to feet and stands on the ground. Its upper body moves as a half-body character's;
+the whole figure sways from the ankles, the hips shift their weight, a skirt's hem trails behind, and a hop or a lean
+toward the camera crouches it while the feet stay put. Pick the shot with `view.fit`:
+
+```js
+player.view.fit = 'whole'   // 'frame' (head and chest, the default), 'knee' or 'whole'
+```
+
+Drivers see `frame.grounded` and can dip the upper body with `frame.talk`, and a recorded pose keeps the crouch and the
+dip: see [Full-body characters](API.md#full-body-characters) in API.md.
+
 ## Featured characters
 
-`characters/` holds 25 characters, ready to `load()`; four of them (f05–f08) are full-body. They carry a small LivLiv mark in the bottom-right corner, which
-the player draws. They are **not** covered by the Apache License. Most were made by LivLiv: use those free for personal, non-commercial projects with credit
+`characters/` holds 25 characters, ready to `load()`; four of them (f05–f08) are full-body. They are **not** covered by
+the Apache License. Most were made by LivLiv: use those free for personal, non-commercial projects with credit
 ("Characters: LivLiv (livliv.ai)"); don't sell them, use them commercially or train AI models on them. Nana is
 LivLiv's mascot. The terms are in [characters/LICENSE.md](characters/LICENSE.md).
 
 Kujira, Kujira Q and Pen come from other people's work: that licence and that credit don't cover them. Their sources,
 credits and terms are in [characters/CREDITS.md](characters/CREDITS.md).
 
-Each also has a `cover.webp` (512 x 768, about 50 KB), its first frame without the mark. `player.load(source, { poster })`
+Each also has a `cover.webp` (512 x 768, about 50 KB; a full-body character's is 512 x 1024, its whole figure), its
+first frame. `player.load(source, { poster })`
 shows it on the canvas until the first frame. To have it before any script has run, put it under the canvas with
 `object-fit: contain` and fade the character in over it, as [example/loading.js](example/loading.js) does.
 
@@ -110,6 +127,8 @@ shows it on the canvas until the first frame. To have it before any script has r
 | `s01` | Hana | `p01` | Kujira | `v06` | Usa |
 | `q02` | Mochi | `p02` | Kujira Q | `v07` | Stella |
 | `q03` | Kotaro | `p03` | Pen | `w01` | Max |
+| `f05` | Tsubaki (full-body) | `f06` | Neve (full-body) | `f07` | Juno (full-body) |
+| `f08` | Viola (full-body) | | | | |
 
 ## Characters of your own
 
@@ -120,8 +139,8 @@ picture on [livliv.ai](https://livliv.ai).
 - **A VRM**: from VRoid Studio or any tool that exports VRM 0.x or 1.0.
 - **A LivLiv model**: make one from a picture on [livliv.ai](https://livliv.ai), then download its model package from
   the character's page (**Model package**): a `.livliv` file. Pass it to `load()` as it is (a URL, or the `File`
-  someone picked), or unzipped as a folder. Packages on the free plan carry the LivLiv mark, and the player draws it.
-  Full-body characters play too (from 0.5), standing on the ground; livliv.ai does not offer their packages yet.
+  someone picked), or unzipped as a folder. Full-body characters play too (from 0.5); livliv.ai does not offer their
+  packages yet.
 
 ## About the player and the characters
 

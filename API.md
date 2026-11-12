@@ -255,8 +255,8 @@ function show(parent, source) {
 An exported package says which mark it carries (`meta.watermark` in `model.json`). The player draws it into the canvas,
 the way livliv.ai shows it, so screenshots and recordings of the canvas carry it too:
 
-- `livliv` (free plan): the LivLiv logo, medium-sized and light over the character and solid in the bottom-right
-  corner; with `"center": false` (the featured characters), only the one in the corner
+- `livliv` (free plan): the LivLiv logo, in white with a thin dark outline over the character and solid in the
+  bottom-right corner; with `"center": false` (the featured characters), only the one in the corner
 - `text` (your own mark, set on a paid plan): that text, small, in the bottom-right corner
 - `none`: nothing
 

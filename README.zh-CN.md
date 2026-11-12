@@ -19,6 +19,7 @@
 - WebGL2，无依赖，核心 gzip 后约 30 KB
 - 口型同步（麦克风、音频、视频）和摄像头面捕（MediaPipe），都在浏览器里运行，按需引入
 - 支持 LivLiv、VRM 和 PNGTuber 三种角色，用同一套接口
+- 全身角色双脚站在地面上：会晃、会蹲，说话时上身轻轻一沉，取景自己选
 - [`characters/`](characters/) 里有 25 个精选角色，可以直接用
 
 ## 试一试
@@ -83,13 +84,25 @@ await png.load({ closed: 'me-closed.png', open: 'me-open.png' })
 
 > npm 包里只有播放器。精选角色在这个仓库的 [`characters/`](characters/) 里，把要用的角色连同许可一起复制到你的页面旁边。
 
+## 全身角色
+
+<p align="center"><img src="media/full-body.webp" alt="Tsubaki、Neve、Juno、Viola，4 个全身精选角色" width="560"></p>
+
+全身角色从头画到脚，双脚站在地面上。上半身的动作和半身角色一样；整个人以脚踝为支点轻轻摆动，胯部会移动重心，裙摆跟在后面；跳起前或朝镜头前倾时会屈膝下蹲，脚不离地。用 `view.fit` 选取景：
+
+```js
+player.view.fit = 'whole'   // 'frame'（头和上身，默认）、'knee'（到膝盖）或 'whole'（整个人）
+```
+
+驱动可以读到 `frame.grounded`，用 `frame.talk` 让上身随说话下沉；录下的姿势会保留下蹲和下沉。详见 API.md 的 [Full-body characters](API.md#full-body-characters)。
+
 ## 精选角色
 
-`characters/` 里有 25 个角色，可以直接 `load()`，其中 f05–f08 这 4 个是全身角色。它们右下角带一个小小的 LivLiv 标，播放器会画出来。它们**不**适用 Apache 许可。大部分由 LivLiv 制作：个人非商业用途可以免费使用，请署名（「角色：LivLiv（livliv.ai）」）；不能出售、不能商用、不能用来训练 AI 模型。Nana 是 LivLiv 的吉祥物。完整条款见 [characters/LICENSE.md](characters/LICENSE.md)。
+`characters/` 里有 25 个角色，可以直接 `load()`，其中 f05–f08 这 4 个是全身角色。它们**不**适用 Apache 许可。大部分由 LivLiv 制作：个人非商业用途可以免费使用，请署名（「角色：LivLiv（livliv.ai）」）；不能出售、不能商用、不能用来训练 AI 模型。Nana 是 LivLiv 的吉祥物。完整条款见 [characters/LICENSE.md](characters/LICENSE.md)。
 
 Kujira、Kujira Q 和 Pen 来自别人的作品，不适用上面的许可和署名。它们的来源、署名和条款见 [characters/CREDITS.md](characters/CREDITS.md)。
 
-每个角色还带一张 `cover.webp`（512 x 768，约 50 KB），是它的第一帧，不带标。`player.load(source, { poster })` 会在第一帧出来之前把它显示在画布上。如果想在脚本运行之前就有画面，就把它放在画布下面（`object-fit: contain`），角色好了再淡入，[example/loading.js](example/loading.js) 就是这样做的。
+每个角色还带一张 `cover.webp`（512 x 768，约 50 KB；全身角色是 512 x 1024 的整个人），是它的第一帧。`player.load(source, { poster })` 会在第一帧出来之前把它显示在画布上。如果想在脚本运行之前就有画面，就把它放在画布下面（`object-fit: contain`），角色好了再淡入，[example/loading.js](example/loading.js) 就是这样做的。
 
 角色列表见[英文 README](README.md#featured-characters)。
 
@@ -99,7 +112,7 @@ Kujira、Kujira Q 和 Pen 来自别人的作品，不适用上面的许可和署
 
 - **PNGTuber**：两张图（闭嘴、张嘴），有闭眼的两张更好。
 - **VRM**：VRoid Studio 或任何能导出 VRM 0.x / 1.0 的工具做的。
-- **LivLiv 模型**：在 [livliv.ai](https://livliv.ai) 用一张图做出角色，在角色页下载**模型包**（一个 `.livliv` 文件），直接传给 `load()`（URL，或用户选的 `File`），解压后的文件夹也可以。免费版的模型包带 LivLiv 水印，播放器会画出来。全身角色也能播放（0.5 起），双脚站在地面上；livliv.ai 暂时还不提供全身角色的模型包。
+- **LivLiv 模型**：在 [livliv.ai](https://livliv.ai) 用一张图做出角色，在角色页下载**模型包**（一个 `.livliv` 文件），直接传给 `load()`（URL，或用户选的 `File`），解压后的文件夹也可以。全身角色也能播放（0.5 起）；livliv.ai 暂时还不提供全身角色的模型包。
 
 ## 关于播放器和角色
 
