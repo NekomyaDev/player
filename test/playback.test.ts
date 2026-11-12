@@ -54,10 +54,15 @@ test('a recorded final pose replays at exact output dimensions without drivers o
   assert.equal(frames.at(-1)?.width, 200, 'resize follows the new canvas CSS dimensions')
   pose.params.angleX = -20
   assert.equal(player.getPose().params.angleX, 24, 'saved poses cannot mutate the player')
+  player.renderPose({ ...pose, params: { ...pose.params, angleX: NaN, angleY: 500 }, move: { x: Infinity, y: 0.01, s: 1 }, expr: { happy: 3 } })
+  const kept = frames.at(-1)!.pose
+  assert.deepEqual([kept.params.angleX, kept.params.angleY, kept.move.x, kept.expr.happy], [0, 30, 0, 1], 'a pose from elsewhere is kept in range')
+  assert.throws(() => player.renderPose(pose, 0, [640] as unknown as [number, number]), /dimensions/)
   player.play()
   assert.throws(() => player.renderPose(pose), /pause/)
   player.dispose()
   assert.equal(player.onFrame, undefined)
+  assert.doesNotThrow(() => { player.renderPose(pose); player.resize(); player.snapshot() }, 'a disposed player draws nothing, as in 0.3')
 })
 
 

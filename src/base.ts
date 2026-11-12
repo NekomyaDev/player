@@ -136,6 +136,15 @@ export async function readBody(r: Response, job: LoadJob, share = (p: number) =>
 const DEFAULTS = defaultParams()
 const KEYS = Object.keys(PARAM_RANGES) as (keyof Params)[]
 
+/** in range whoever set it; a value that is no number (one NaN stays in the springs for good) counts as not set */
+function inRange(P: Params) {
+  for (const k of KEYS) {
+    const v = +P[k]
+    P[k] = v === v ? clamp(v, PARAM_RANGES[k][0], PARAM_RANGES[k][1]) : DEFAULTS[k]
+  }
+}
+const finite = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
+
 export abstract class PlayerBase<Info extends { expressions: { id: string }[] }> implements Host {
   readonly canvas: HTMLCanvasElement
   /** your values for the pose and face (ranges in PARAM_RANGES). The player never changes them */
@@ -386,21 +395,23 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
   }
 
   /** Draws a recorded pose without running idle motion, drivers or actions again. Pause first. `dt` advances hair and
-   *  other physics; `size` sets exact output pixels even on a detached canvas. The model's mark is retained. */
+   *  other physics; `size` sets exact output pixels even on a detached canvas. The model's mark is retained. The player
+   *  takes the pose's view. Nothing is drawn before a model is loaded, after dispose() or once the context is lost */
   renderPose(pose: PlaybackPose, dt = 0, size?: [number, number]): void {
     if (this.playing) throw new TypeError('LivLiv: pause the player before rendering a recorded pose')
-    if (this.disposed) throw new LivLivError('released', 'LivLiv: this player was disposed')
-    if (this.contextLost) throw contextGone()
-    if (!this.drawable) return
-    if (!Number.isFinite(dt) || dt < 0 || (size && size.some((n) => !Number.isInteger(n) || n < 1))) {
+    if (!Number.isFinite(dt) || dt < 0 || (size && (size.length !== 2 || size.some((n) => !Number.isInteger(n) || n < 1)))) {
       throw new TypeError('LivLiv: renderPose needs a nonnegative dt and positive integer output dimensions')
     }
-    Object.assign(this.frame.params, pose.params)
-    Object.assign(this.frame.move, pose.move)
-    Object.assign(this.view, pose.view)
+    if (!this.drawable || this.disposed || this.contextLost) return
+    // a pose from elsewhere (a file, another page) is kept in range like a live one: a NaN would stay in the springs
+    const f = this.frame, V = this.view, M = pose.move, W = pose.view
+    Object.assign(f.params, pose.params)
+    inRange(f.params)
+    Object.assign(f.move, { x: finite(M?.x, 0), y: finite(M?.y, 0), s: finite(M?.s, 1) })
+    Object.assign(V, { x: finite(W?.x, V.x), y: finite(W?.y, V.y), zoom: finite(W?.zoom, V.zoom), head: typeof W?.head === 'boolean' ? W.head : V.head })
     const expr = this.shownExpr
     for (const key of Object.keys(expr)) delete expr[key]
-    Object.assign(expr, pose.expr)
+    for (const [key, w] of Object.entries(pose.expr ?? {})) expr[key] = clamp(finite(w, 0), 0, 1)
     this.replaying = true; this.replaySize = size ?? null
     this.renderSize = this.replaySize
     try { this.show(dt) } finally { this.renderSize = null }
@@ -452,11 +463,7 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
     f.add(A.update(dt))
     if (this.smile) P.smile = Math.max(P.smile, this.smile)
     if (A.awayW) for (const [k, v] of Object.entries(A.awayPose(t)) as [keyof Params, number][]) P[k] += (v - P[k]) * A.awayW
-    // in range whoever set it; a value that is no number (one NaN stays in the springs for good) counts as not set
-    for (const k of KEYS) {
-      const v = +P[k]
-      P[k] = v === v ? clamp(v, PARAM_RANGES[k][0], PARAM_RANGES[k][1]) : DEFAULTS[k]
-    }
+    inRange(P)
     Object.assign(P, this.parameterFilter.apply(P, dt))
     // expressions ease in and out (one no longer shown eases back to 0); dozing hides them, each is a face with open eyes
     for (const k of Object.keys(this.expr)) if (!(k in E)) E[k] = 0
