@@ -1,0 +1,697 @@
+{
+ "format": "livliv-model",
+ "version": 4,
+ "name": "Viola",
+ "meta": {
+  "generator": {
+   "name": "livliv.ai"
+  },
+  "created": "2026-11-12T11:35:33Z",
+  "license": {
+   "id": "LicenseRef-LivLiv-Samples",
+   "url": "https://livliv.ai/licenses/samples",
+   "text": "LivLiv Featured Characters License 1.0: free for non-commercial use with credit (\"Characters: LivLiv (livliv.ai)\"); no selling or separate distribution, no commercial use without permission, no AI training. The full text is LICENSE.md beside the characters."
+  },
+  "watermark": {
+   "kind": "livliv",
+   "center": false
+  }
+ },
+ "requires": [
+  "full_body"
+ ],
+ "files": {
+  "avatar": "avatar.webp"
+ },
+ "canvas": [
+  1536,
+  3072
+ ],
+ "profile": {
+  "id": "anime_half",
+  "facing": "front",
+  "glasses": false
+ },
+ "rig": {
+  "yaw": 0.33,
+  "pitch": 0.24,
+  "roll": 0.55,
+  "bulge": 0.85,
+  "hair": {
+   "front": [
+    140,
+    11,
+    0.022,
+    70,
+    7
+   ],
+   "back": [
+    73.02,
+    6.78,
+    0.06,
+    36.51,
+    4.32
+   ]
+  },
+  "hair_limit": 0.25,
+  "wind": 1,
+  "breath": 1,
+  "sway": 1,
+  "brow": 0.06,
+  "body": {
+   "yaw": 0.455,
+   "roll": 0.3,
+   "breath": 1.3,
+   "bust": 0
+  },
+  "bulge_extent": [
+   1.4,
+   1.35,
+   1,
+   1,
+   0.4
+  ],
+  "neck": {
+   "twist": 0.35,
+   "reach": 0.45
+  },
+  "jaw": 0.02,
+  "lattice": 12
+ },
+ "anchors": {
+  "head": {
+   "cx": 768.5,
+   "cy": 284.5,
+   "rx": 124.5,
+   "ry": 173.5
+  },
+  "face": [
+   630.3046875,
+   202.0859375,
+   906.671875,
+   475.5234375
+  ],
+  "neck_y": 458,
+  "top_y": 32,
+  "bottom_y": 2992,
+  "hair_root_y": 111,
+  "eyes": [
+   [
+    666.4375,
+    304.625,
+    729.9140625,
+    336.8515625
+   ],
+   [
+    804.1328125,
+    293.8828125,
+    868.5859375,
+    328.0625
+   ]
+  ],
+  "brows": [
+   [
+    650,
+    262,
+    745,
+    275
+   ],
+   [
+    793,
+    253,
+    879,
+    280
+   ]
+  ],
+  "brow_lines": [
+   {
+    "x": [
+     607.2,
+     623.7,
+     640.1,
+     656.5,
+     672.9,
+     689.3,
+     705.7,
+     722.1,
+     738.5,
+     754.9,
+     771.3,
+     787.8
+    ],
+    "bottom": [
+     275,
+     275,
+     275,
+     271,
+     268,
+     267,
+     269,
+     271,
+     275,
+     269,
+     269,
+     269
+    ],
+    "lid": [
+     301.8,
+     301.8,
+     301.8,
+     305,
+     297,
+     291,
+     292,
+     296,
+     301.8,
+     295.8,
+     295.8,
+     295.8
+    ]
+   },
+   {
+    "x": [
+     754.3,
+     769.2,
+     784,
+     798.9,
+     813.7,
+     828.6,
+     843.4,
+     858.3,
+     873.1,
+     888,
+     902.8,
+     917.7
+    ],
+    "bottom": [
+     268,
+     268,
+     268,
+     267,
+     262,
+     259,
+     256,
+     257,
+     267,
+     280,
+     280,
+     280
+    ],
+    "lid": [
+     317.2,
+     317.2,
+     317.2,
+     316.2,
+     287,
+     282,
+     281,
+     284,
+     283,
+     329.2,
+     329.2,
+     329.2
+    ],
+    "cap": [
+     20.8,
+     20.8,
+     20.8,
+     20.8,
+     20.8,
+     20.8,
+     20.8,
+     20.8,
+     1.5,
+     1.5,
+     1.5,
+     1.5
+    ]
+   }
+  ],
+  "jaw": {
+   "top": 381,
+   "chin": 458,
+   "half": 0,
+   "open": 0,
+   "round": 0,
+   "wide": 0
+  },
+  "chest": {
+   "cx": 768.48828125,
+   "cy": 786,
+   "rx": 231.04296875,
+   "ry": 98.4375
+  },
+  "body": {
+   "neck": [
+    769,
+    607.21,
+    1
+   ],
+   "shoulder_r": [
+    561.77,
+    602.22,
+    0.806
+   ],
+   "elbow_r": [
+    481.88,
+    971.74,
+    0.864
+   ],
+   "wrist_r": [
+    377.01,
+    1341.25,
+    0.805
+   ],
+   "shoulder_l": [
+    976.23,
+    612.2,
+    0.82
+   ],
+   "elbow_l": [
+    1061.12,
+    991.71,
+    0.841
+   ],
+   "wrist_l": [
+    1160.99,
+    1351.24,
+    0.798
+   ],
+   "hip_r": [
+    616.7,
+    1351.24,
+    0.612
+   ],
+   "knee_r": [
+    641.67,
+    1935.48,
+    0.894
+   ],
+   "ankle_r": [
+    611.71,
+    2599.61,
+    0.73
+   ],
+   "hip_l": [
+    921.3,
+    1351.24,
+    0.644
+   ],
+   "knee_l": [
+    901.33,
+    1945.47,
+    0.926
+   ],
+   "ankle_l": [
+    931.29,
+    2569.65,
+    0.78
+   ],
+   "conf": 0.612,
+   "ground_y": 2992
+  },
+  "hair_bottom_y": 610,
+  "frame": [
+   268,
+   -86,
+   1268,
+   1414
+  ]
+ },
+ "expressions": [
+  {
+   "id": "smile",
+   "label": {
+    "zh": "笑",
+    "zh-Hant": "笑",
+    "en": "Smile",
+    "ja": "笑顔"
+   },
+   "hotkey": "1"
+  },
+  {
+   "id": "shy",
+   "label": {
+    "zh": "害羞",
+    "zh-Hant": "害羞",
+    "en": "Shy",
+    "ja": "照れ"
+   },
+   "hotkey": "2"
+  },
+  {
+   "id": "angry",
+   "label": {
+    "zh": "生气",
+    "zh-Hant": "生氣",
+    "en": "Angry",
+    "ja": "怒り"
+   },
+   "hotkey": "3"
+  },
+  {
+   "id": "sad",
+   "label": {
+    "zh": "难过",
+    "zh-Hant": "難過",
+    "en": "Sad",
+    "ja": "悲しい"
+   },
+   "hotkey": "4"
+  }
+ ],
+ "layers": [
+  {
+   "id": "back_hair",
+   "texture": "textures/back_hair.webp",
+   "x": 534,
+   "y": 28,
+   "w": 479,
+   "h": 607,
+   "group": "hair_back",
+   "depth": -0.35
+  },
+  {
+   "id": "body",
+   "texture": "textures/body.webp",
+   "x": 297,
+   "y": 316,
+   "w": 945,
+   "h": 2675,
+   "group": "body",
+   "depth": 0
+  },
+  {
+   "id": "neck_shadow",
+   "texture": "textures/neck_shadow.webp",
+   "x": 701,
+   "y": 419,
+   "w": 130,
+   "h": 126,
+   "group": "head",
+   "depth": 0,
+   "role": "neck_shadow"
+  },
+  {
+   "id": "inner_hair",
+   "texture": "textures/inner_hair.webp",
+   "x": 631,
+   "y": 465,
+   "w": 285,
+   "h": 110,
+   "group": "hair_inner",
+   "depth": 0
+  },
+  {
+   "id": "face",
+   "texture": "textures/face.webp",
+   "x": 639,
+   "y": 107,
+   "w": 254,
+   "h": 356,
+   "group": "head",
+   "depth": 0
+  },
+  {
+   "id": "eye_L_skin",
+   "texture": "textures/eye_L_skin.webp",
+   "x": 656,
+   "y": 285,
+   "w": 84,
+   "h": 60,
+   "group": "head",
+   "depth": 0
+  },
+  {
+   "id": "eye_L_closed",
+   "texture": "textures/eye_L_closed.webp",
+   "x": 641,
+   "y": 281,
+   "w": 103,
+   "h": 72,
+   "group": "head",
+   "depth": 0,
+   "role": "lid_L"
+  },
+  {
+   "id": "eye_L",
+   "texture": "textures/eye_L.webp",
+   "mask": "textures/eye_L_mask.webp",
+   "x": 641,
+   "y": 281,
+   "w": 103,
+   "h": 72,
+   "group": "head",
+   "depth": 0,
+   "role": "eye_L",
+   "pivot": [
+    698.17578125,
+    324.60546875
+   ]
+  },
+  {
+   "id": "iris_L",
+   "texture": "textures/iris_L.webp",
+   "x": 674,
+   "y": 288,
+   "w": 57,
+   "h": 58,
+   "group": "head",
+   "depth": 0,
+   "role": "iris_L",
+   "pivot": [
+    698.17578125,
+    324.60546875
+   ],
+   "clip": "eye_L",
+   "range": [
+    12.060546875,
+    5.478515625
+   ]
+  },
+  {
+   "id": "eye_R_skin",
+   "texture": "textures/eye_R_skin.webp",
+   "x": 795,
+   "y": 275,
+   "w": 83,
+   "h": 59,
+   "group": "head",
+   "depth": 0
+  },
+  {
+   "id": "eye_R_closed",
+   "texture": "textures/eye_R_closed.webp",
+   "x": 791,
+   "y": 271,
+   "w": 102,
+   "h": 67,
+   "group": "head",
+   "depth": 0,
+   "role": "lid_R"
+  },
+  {
+   "id": "eye_R",
+   "texture": "textures/eye_R.webp",
+   "mask": "textures/eye_R_mask.webp",
+   "x": 791,
+   "y": 270,
+   "w": 100,
+   "h": 68,
+   "group": "head",
+   "depth": 0,
+   "role": "eye_R",
+   "pivot": [
+    836.359375,
+    315.07421875
+   ]
+  },
+  {
+   "id": "iris_R",
+   "texture": "textures/iris_R.webp",
+   "x": 806,
+   "y": 278,
+   "w": 55,
+   "h": 56,
+   "group": "head",
+   "depth": 0,
+   "role": "iris_R",
+   "pivot": [
+    836.359375,
+    315.07421875
+   ],
+   "clip": "eye_R",
+   "range": [
+    12.24609375,
+    5.810546875
+   ]
+  },
+  {
+   "id": "mouth",
+   "texture": "textures/mouth.webp",
+   "frames": [
+    "textures/mouth_f0.webp",
+    "textures/mouth_f1.webp",
+    "textures/mouth_f2.webp",
+    "textures/mouth_f3.webp",
+    "textures/mouth_f4.webp"
+   ],
+   "visemes": [
+    "closed",
+    "half",
+    "open",
+    "round",
+    "wide"
+   ],
+   "x": 722,
+   "y": 371,
+   "w": 98,
+   "h": 73,
+   "group": "head",
+   "depth": 0,
+   "role": "mouth",
+   "pivot": [
+    768.48828125,
+    381
+   ]
+  },
+  {
+   "id": "expr_smile",
+   "texture": "textures/expr_smile.webp",
+   "talk": "textures/expr_smile_talk.webp",
+   "brow_tex": "textures/expr_smile_newbrows.webp",
+   "x": 632,
+   "y": 227,
+   "w": 272,
+   "h": 227,
+   "group": "head",
+   "depth": 0,
+   "role": "expr",
+   "expression": "smile",
+   "brows": "redrawn"
+  },
+  {
+   "id": "expr_shy",
+   "texture": "textures/expr_shy.webp",
+   "talk": "textures/expr_shy_talk.webp",
+   "brow_tex": "textures/expr_shy_newbrows.webp",
+   "x": 637,
+   "y": 228,
+   "w": 260,
+   "h": 226,
+   "group": "head",
+   "depth": 0,
+   "role": "expr",
+   "expression": "shy",
+   "brows": "redrawn"
+  },
+  {
+   "id": "expr_angry",
+   "texture": "textures/expr_angry.webp",
+   "talk": "textures/expr_angry_talk.webp",
+   "brow_tex": "textures/expr_angry_newbrows.webp",
+   "x": 637,
+   "y": 228,
+   "w": 260,
+   "h": 226,
+   "group": "head",
+   "depth": 0,
+   "role": "expr",
+   "expression": "angry",
+   "brows": "redrawn"
+  },
+  {
+   "id": "expr_sad",
+   "texture": "textures/expr_sad.webp",
+   "talk": "textures/expr_sad_talk.webp",
+   "brow_tex": "textures/expr_sad_newbrows.webp",
+   "x": 637,
+   "y": 228,
+   "w": 260,
+   "h": 226,
+   "group": "head",
+   "depth": 0,
+   "role": "expr",
+   "expression": "sad",
+   "brows": "redrawn"
+  },
+  {
+   "id": "side_hair",
+   "texture": "textures/side_hair.webp",
+   "x": 562,
+   "y": 355,
+   "w": 407,
+   "h": 225,
+   "group": "hair_side",
+   "depth": 0.1
+  },
+  {
+   "id": "front_hair",
+   "texture": "textures/front_hair.webp",
+   "x": 636,
+   "y": 103,
+   "w": 266,
+   "h": 348,
+   "group": "hair_front",
+   "depth": 0.07
+  },
+  {
+   "id": "brows",
+   "texture": "textures/brows.webp",
+   "x": 648,
+   "y": 246,
+   "w": 236,
+   "h": 40,
+   "group": "head",
+   "depth": 0
+  },
+  {
+   "id": "expr_sad_brows",
+   "texture": "textures/expr_sad_brows.webp",
+   "x": 648,
+   "y": 246,
+   "w": 236,
+   "h": 40,
+   "group": "head",
+   "depth": 0,
+   "role": "expr_brows",
+   "expression": "sad"
+  },
+  {
+   "id": "expr_angry_brows",
+   "texture": "textures/expr_angry_brows.webp",
+   "x": 648,
+   "y": 246,
+   "w": 236,
+   "h": 40,
+   "group": "head",
+   "depth": 0,
+   "role": "expr_brows",
+   "expression": "angry"
+  },
+  {
+   "id": "expr_shy_brows",
+   "texture": "textures/expr_shy_brows.webp",
+   "x": 648,
+   "y": 246,
+   "w": 236,
+   "h": 40,
+   "group": "head",
+   "depth": 0,
+   "role": "expr_brows",
+   "expression": "shy"
+  },
+  {
+   "id": "expr_smile_brows",
+   "texture": "textures/expr_smile_brows.webp",
+   "x": 646,
+   "y": 246,
+   "w": 239,
+   "h": 40,
+   "group": "head",
+   "depth": 0,
+   "role": "expr_brows",
+   "expression": "smile"
+  }
+ ]
+}

@@ -7,7 +7,7 @@
 
 <p align="center">
   超轻量的 2.5D 网页角色播放器，支持口型同步和摄像头面捕，几行代码就能接入网页、直播画面和应用。<br>
-  自带 21 个风格各异的精选角色，即开即用。
+  自带 25 个风格各异的精选角色，即开即用。
 </p>
 
 <p align="center"><a href="README.md">English</a> · <b>中文</b> · <a href="README.ja.md">日本語</a> · <a href="README.vi.md">Tiếng Việt</a></p>
@@ -19,7 +19,7 @@
 - WebGL2，无依赖，核心 gzip 后约 30 KB
 - 口型同步（麦克风、音频、视频）和摄像头面捕（MediaPipe），都在浏览器里运行，按需引入
 - 支持 LivLiv、VRM 和 PNGTuber 三种角色，用同一套接口
-- [`characters/`](characters/) 里有 21 个精选角色，可以直接用
+- [`characters/`](characters/) 里有 25 个精选角色，可以直接用
 
 ## 试一试
 
@@ -85,7 +85,7 @@ await png.load({ closed: 'me-closed.png', open: 'me-open.png' })
 
 ## 精选角色
 
-`characters/` 里有 21 个角色，可以直接 `load()`。它们右下角带一个小小的 LivLiv 标，播放器会画出来。它们**不**适用 Apache 许可。大部分由 LivLiv 制作：个人非商业用途可以免费使用，请署名（「角色：LivLiv（livliv.ai）」）；不能出售、不能商用、不能用来训练 AI 模型。Nana 是 LivLiv 的吉祥物。完整条款见 [characters/LICENSE.md](characters/LICENSE.md)。
+`characters/` 里有 25 个角色，可以直接 `load()`，其中 f05–f08 这 4 个是全身角色。它们右下角带一个小小的 LivLiv 标，播放器会画出来。它们**不**适用 Apache 许可。大部分由 LivLiv 制作：个人非商业用途可以免费使用，请署名（「角色：LivLiv（livliv.ai）」）；不能出售、不能商用、不能用来训练 AI 模型。Nana 是 LivLiv 的吉祥物。完整条款见 [characters/LICENSE.md](characters/LICENSE.md)。
 
 Kujira、Kujira Q 和 Pen 来自别人的作品，不适用上面的许可和署名。它们的来源、署名和条款见 [characters/CREDITS.md](characters/CREDITS.md)。
 

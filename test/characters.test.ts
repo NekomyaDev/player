@@ -27,17 +27,19 @@ describe('featured characters', { skip: !ids.length && 'no characters/ here' }, 
       const raw = JSON.parse(readFileSync(join(dir, 'model.json'), 'utf8'))
       assert.equal(raw.format, FORMAT)
       assert.ok(raw.version <= FORMAT_VERSION)
-      assert.deepEqual(raw.requires ?? [], [])
+      // a full-body character lists the feature, so that a player before 0.5 refuses it rather than drawing it wrong
+      assert.deepEqual(raw.requires ?? [], raw.anchors?.body ? ['full_body'] : [])
       assert.equal(raw.meta?.license?.id, { p01: 'CC-BY-NC-SA-4.0', p02: 'CC-BY-NC-SA-4.0', p03: 'LicenseRef-Third-Party-Character' }[id] ?? 'LicenseRef-LivLiv-Samples')
       assert.equal(raw.meta?.watermark?.kind, 'livliv')  // the LivLiv logo, in the corner only
       assert.equal(raw.meta?.watermark?.center, false)
       for (const e of raw.expressions || []) assert.deepEqual(LANGS.filter((l) => !e.label?.[l]), [], `${e.id}'s names`)
       for (const f of Object.values(raw.files || {}) as string[]) assert.ok(existsSync(join(dir, f)), f)
       assert.equal(raw.rig?.body?.bust ?? 0, 0, 'no chest spring, for players that still read it')
-      // the cover a page shows first: a WebP with alpha (VP8X), 512 x 768, small enough to come well before the package
+      // the cover a page shows first: a WebP with alpha (VP8X), 512 x 768 (a full-body character's whole figure: 512 x
+      // 1024), small enough to come well before the package
       const cover = readFileSync(join(dir, 'cover.webp'))
       assert.equal(cover.toString('latin1', 8, 16), 'WEBPVP8X')
-      assert.deepEqual([cover.readUIntLE(24, 3) + 1, cover.readUIntLE(27, 3) + 1], [512, 768])
+      assert.deepEqual([cover.readUIntLE(24, 3) + 1, cover.readUIntLE(27, 3) + 1], [512, raw.anchors?.body ? 1024 : 768])
       assert.ok(cover.length < 120_000, `${cover.length} bytes`)
       if (existsSync(join(root, `${id}.livliv`))) assert.ok(!readFileSync(join(root, `${id}.livliv`)).includes('cover.webp'), 'the package has no cover')
       // as the player reads it: every image it will ask for is there, each expression has its layer

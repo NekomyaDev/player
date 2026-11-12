@@ -48,6 +48,7 @@
   needWebGL(Player)
   const canvas = document.getElementById('stage'), cover = document.getElementById('cover')
   const player = new Player(canvas, { maxPixelRatio: 1.5 })
+  player.view.fit = 'whole'  // a full-body character stands whole on the stage (a half-body one fills it as ever)
   watchContext(player)
   const bar = document.getElementById('bar'), name = document.getElementById('name'), credit = document.getElementById('credit'), ul = document.getElementById('cast')
   const buttons = new Map()

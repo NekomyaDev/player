@@ -7,7 +7,7 @@
 
 <p align="center">
   超軽量の Web 向けキャラクタープレイヤー。リップシンクと Web カメラのフェイストラッキングに対応し、数行のコードでページや配信画面、アプリに組み込めます。<br>
-  さまざまなスタイルの厳選キャラクター 21 体を同梱。すぐに使えます。
+  さまざまなスタイルの厳選キャラクター 25 体を同梱。すぐに使えます。
 </p>
 
 <p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">中文</a> · <b>日本語</b> · <a href="README.vi.md">Tiếng Việt</a></p>
@@ -17,7 +17,7 @@
 - WebGL2、依存なし、コアは gzip で約 30 KB
 - リップシンク（マイク、音声、動画）と Web カメラのフェイストラッキング（MediaPipe）はブラウザ内で動作し、必要なときだけ読み込めます
 - LivLiv・VRM・PNGTuber のキャラクターを同じ API で再生
-- [`characters/`](characters/) に厳選キャラクター 21 体。すぐに使えます
+- [`characters/`](characters/) に厳選キャラクター 25 体。すぐに使えます
 
 ## 試してみる
 
@@ -83,7 +83,7 @@ API の全体は [API.md](API.md)（英語）にあります：オプション�
 
 ## 厳選キャラクター
 
-`characters/` には 21 体のキャラクターが入っていて、そのまま `load()` できます。右下に小さな LivLiv のマークが入っていて、プレイヤーがそれを描きます。これらには Apache License は**適用されません**。大半は LivLiv が制作したもので、個人の非商用利用は、クレジット（「キャラクター：LivLiv（livliv.ai）」）を入れれば無料です。販売、商用利用、AI モデルの学習には使えません。Nana は LivLiv のマスコットです。条文は [characters/LICENSE.md](characters/LICENSE.md) をご覧ください。
+`characters/` には 25 体のキャラクターが入っていて、そのまま `load()` できます（f05〜f08 の 4 体は全身）。右下に小さな LivLiv のマークが入っていて、プレイヤーがそれを描きます。これらには Apache License は**適用されません**。大半は LivLiv が制作したもので、個人の非商用利用は、クレジット（「キャラクター：LivLiv（livliv.ai）」）を入れれば無料です。販売、商用利用、AI モデルの学習には使えません。Nana は LivLiv のマスコットです。条文は [characters/LICENSE.md](characters/LICENSE.md) をご覧ください。
 
 Kujira、Kujira Q、Pen は他の方の作品に基づくもので、上記のライセンスとクレジットは適用されません。出典、クレジット、条件は [characters/CREDITS.md](characters/CREDITS.md) をご覧ください。
 

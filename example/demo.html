@@ -28,6 +28,7 @@
   needWebGL(Player)
   const canvas = document.getElementById('stage'), cover = document.getElementById('cover')
   const player = new Player(canvas)
+  player.view.fit = 'whole'  // a full-body character: its whole figure first (the buttons pick another shot)
   watchContext(player)
   const bar = document.getElementById('bar'), status = document.getElementById('status')
   window.player = player  // to try things in the console
@@ -68,6 +69,13 @@
       exprs.forEach((o) => o.setAttribute('aria-pressed', String(o === b)))
     }))
     for (const a of ['nod', 'shake', 'tilt', 'hop']) button(a, () => player.act(a))
+    if (m.fullBody) {  // what the canvas shows of a full-body character
+      const shots = [['whole', 'whole figure'], ['knee', 'to the knees'], ['frame', 'head and chest']].map(([fit, label]) => button(label, (b) => {
+        player.view.fit = fit
+        shots.forEach((o) => o.setAttribute('aria-pressed', String(o === b)))
+      }))
+      shots.forEach((o, i) => o.setAttribute('aria-pressed', String(['whole', 'knee', 'frame'][i] === player.view.fit)))
+    }
     let mic = null
     button('microphone', async (b) => {
       if (mic) { mic.stop(); mic = null } else {

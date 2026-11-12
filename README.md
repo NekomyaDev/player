@@ -7,7 +7,7 @@
 
 <p align="center">
   A lightweight 2.5D character player for the web, with lip sync and webcam face tracking. A few lines of code put a character in a page, a stream overlay or an app.<br>
-  Comes with 21 featured characters in different styles, ready to use.
+  Comes with 25 featured characters in different styles, ready to use.
 </p>
 
 <p align="center"><b>English</b> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.vi.md">Tiếng Việt</a></p>
@@ -17,7 +17,7 @@
 - WebGL2, no dependencies, about 30 KB gzipped for the core
 - Lip sync (microphone, audio, video) and webcam face tracking (MediaPipe), both in the browser, imported only when you need them
 - Plays LivLiv, VRM and PNGTuber characters through the same API
-- 21 featured characters in [`characters/`](characters/), ready to use
+- 25 featured characters in [`characters/`](characters/), ready to use
 
 ## Try it
 
@@ -89,7 +89,7 @@ are described in [FORMAT-v3.md](FORMAT-v3.md) and still play.
 
 ## Featured characters
 
-`characters/` holds 21 characters, ready to `load()`. They carry a small LivLiv mark in the bottom-right corner, which
+`characters/` holds 25 characters, ready to `load()`; four of them (f05–f08) are full-body. They carry a small LivLiv mark in the bottom-right corner, which
 the player draws. They are **not** covered by the Apache License. Most were made by LivLiv: use those free for personal, non-commercial projects with credit
 ("Characters: LivLiv (livliv.ai)"); don't sell them, use them commercially or train AI models on them. Nana is
 LivLiv's mascot. The terms are in [characters/LICENSE.md](characters/LICENSE.md).

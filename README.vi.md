@@ -7,7 +7,7 @@
 
 <p align="center">
   Trình phát nhân vật 2.5D nhẹ cho web, có đồng bộ môi (lip sync) và theo dõi khuôn mặt qua webcam. Chỉ vài dòng code là đưa được nhân vật vào trang web, lớp phủ stream hay ứng dụng.<br>
-  Đi kèm 21 nhân vật nổi bật với nhiều phong cách khác nhau, sẵn sàng dùng ngay.
+  Đi kèm 25 nhân vật nổi bật với nhiều phong cách khác nhau, sẵn sàng dùng ngay.
 </p>
 
 <p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a> · <b>Tiếng Việt</b></p>
@@ -17,7 +17,7 @@
 - WebGL2, không phụ thuộc thư viện ngoài, lõi chỉ khoảng 30 KB sau khi nén gzip
 - Đồng bộ môi (microphone, audio, video) và theo dõi khuôn mặt qua webcam (MediaPipe), đều chạy trong trình duyệt, chỉ được tải khi bạn cần
 - Phát nhân vật LivLiv, VRM và PNGTuber qua cùng một API
-- 21 nhân vật nổi bật trong [`characters/`](characters/), sẵn sàng dùng
+- 25 nhân vật nổi bật trong [`characters/`](characters/), sẵn sàng dùng
 
 ## Thử ngay
 
@@ -89,7 +89,7 @@ giới hạn khi đọc file không đáng tin cậy, gói model và phiên bả
 
 ## Nhân vật nổi bật
 
-`characters/` có 21 nhân vật, sẵn sàng để `load()`. Các nhân vật mang một dấu LivLiv nhỏ ở góc dưới bên phải, do
+`characters/` có 25 nhân vật, sẵn sàng để `load()`; 4 nhân vật f05–f08 là nhân vật toàn thân. Các nhân vật mang một dấu LivLiv nhỏ ở góc dưới bên phải, do
 trình phát vẽ lên. Các nhân vật này **không** thuộc phạm vi Giấy phép Apache. Hầu hết do LivLiv tạo ra: bạn được dùng miễn phí cho dự án cá nhân, phi thương mại kèm ghi công
 ("Characters: LivLiv (livliv.ai)"); không được bán, dùng thương mại hay dùng các nhân vật này để huấn luyện mô hình AI. Nana là
 linh vật của LivLiv. Điều khoản có trong [characters/LICENSE.md](characters/LICENSE.md).
