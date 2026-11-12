@@ -1,4 +1,3 @@
-import { projectedAnchor, type AnchorName, type AttachmentAnchor } from '../anchors'
 // LivLiv puppet runtime: loads a LivLiv model (layers + anchors: format.ts reads model.json, v4 `livliv-model` or v3
 // `livemaker-puppet`) and animates it with an automatic rig. WebGL2, no dependencies.
 //
@@ -17,6 +16,7 @@ import { projectedAnchor, type AnchorName, type AttachmentAnchor } from '../anch
 //    the `brows` layer alone where the build gave the brows one (drawn over the bangs); that layer moves with
 //    the bangs where it lies over them
 //  - body: lags the head turn / tilt, breathes (shoulders + chest), optional chest spring
+import { projectedAnchor, type AnchorName, type AttachmentAnchor } from '../anchors'
 import { LIMITS, coded, latticeCell, readModel, type Labels, type ModelFiles, type ModelMeta } from './format'
 import { PARAM_RANGES, defaultParams, smooth, type Params } from './params'
 

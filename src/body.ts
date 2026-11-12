@@ -1,10 +1,10 @@
-import { projectedAnchor, type AnchorName, type AttachmentAnchor } from './anchors'
-export type { AnchorName, AttachmentAnchor } from './anchors'
 // @livliv-dev/player/body: characters that aren't LivLiv models, on the surface of Player. A Body draws one (a PNGTuber's
 // pictures: @livliv-dev/player/png; a VRM: @livliv-dev/player/vrm; or your own); the BodyPlayer gives it what a LivLiv model gets
 // from Player: the idle motion, expressions, actions and drivers, so lip sync (@livliv-dev/player/voice) and face tracking
 // (@livliv-dev/player/tracking) work for it the same way. Each frame the pose is put together as Player does it (your params,
 // the idle motion, the drivers, actions, expressions); the Body turns it into its own picture.
+import { projectedAnchor, type AnchorName, type AttachmentAnchor } from './anchors'
+export type { AnchorName, AttachmentAnchor } from './anchors'
 import { pickLabel, type Labels } from './runtime/format'
 import { defaultParams, type Params } from './runtime/params'
 import { LivLivError, PlayerBase, aborted, contextGone, readBody, type LoadJob, type LoadOptions, type PlayerOptions } from './base'

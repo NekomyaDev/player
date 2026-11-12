@@ -1,4 +1,3 @@
-import { projectedAnchor, type AnchorName, type AttachmentAnchor } from './anchors'
 // @livliv-dev/player/vrm: a VRM (the open 3D avatar format: VRoid and others) on a BodyPlayer (@livliv-dev/player/body), drawn with
 // three.js and @pixiv/three-vrm, which the page installs (optional peer dependencies) and which load only here. The
 // shared params become its pose: the head and neck turn and tilt (angleX / Y / Z), the spine sways (bodyX / Z), the
@@ -6,6 +5,7 @@ import { projectedAnchor, type AnchorName, type AttachmentAnchor } from './ancho
 // ee wide, ou round), the face its expressions (happy with smile; angry, sad, relaxed, surprised); its hair and clothes
 // swing by the model's own spring bones. Framed from the head down to the hips, arms down. VRM 1.0 and 0.x, whoever
 // exported them; a file is looked through before three.js parses it (checkGlb).
+import { projectedAnchor, type AnchorName, type AttachmentAnchor } from './anchors'
 import type * as T from 'three'
 import type { VRM } from '@pixiv/three-vrm'
 import type { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
