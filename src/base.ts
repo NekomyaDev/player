@@ -43,10 +43,23 @@ export interface View { x: number; y: number; zoom: number; head: boolean }
 /** A complete displayed pose, independent of the character format. Safe to keep for a recording or send to another
  *  player. The move includes actions; the view is applied separately. */
 export interface PlaybackPose {
+  /** the final params, in the ranges of PARAM_RANGES */
   params: Params
+  /** the picture's move: x, y shares of the canvas (y up), s a scale. Actions, the talking bob and drivers included */
   move: { x: number; y: number; s: number }
+  /** each expression's weight as shown, 0..1 */
   expr: Record<string, number>
+  /** the player's view (see View) */
   view: View
+  /** Reserved for full-body characters, which a later version plays. Never set for a half-body character, and ignored
+   *  by this version. A full-body character keeps its feet on the ground: there `move.y` is only an action's lift,
+   *  `crouch` how far the hips go down (a hop's crouch, a lean toward the camera) and `dip` how far the upper body
+   *  dips on a syllable, as shares of the frame's height (<= 0), and `talk` the talking bob, apart from `move` */
+  crouch?: number
+  /** see crouch */
+  dip?: number
+  /** see crouch */
+  talk?: number
 }
 
 /** one frame being put together, as a driver sees it */
@@ -403,7 +416,8 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
       throw new TypeError('LivLiv: renderPose needs a nonnegative dt and positive integer output dimensions')
     }
     if (!this.drawable || this.disposed || this.contextLost) return
-    // a pose from elsewhere (a file, another page) is kept in range like a live one: a NaN would stay in the springs
+    // a pose from elsewhere (a file, another page) is kept in range like a live one: a NaN would stay in the springs.
+    // crouch, dip and talk are a full-body character's, which load() refuses here: a half-body one draws without them
     const f = this.frame, V = this.view, M = pose.move, W = pose.view
     Object.assign(f.params, pose.params)
     inRange(f.params)
