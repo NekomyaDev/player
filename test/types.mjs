@@ -16,9 +16,9 @@ fs.rmSync(dir, { recursive: true, force: true })
 fs.mkdirSync(path.join(dir, 'node_modules', path.dirname(name)), { recursive: true })
 fs.symlinkSync(root, path.join(dir, 'node_modules', name), 'dir')
 fs.writeFileSync(path.join(dir, 'use.ts'), `
-import { LivLivError, Player, VERSION, type ActionId, type Driver, type LivLivErrorCode, type LoadOptions, type LoadProgress, type ModelInfo, type View } from '${name}'
+import { LivLivError, Player, VERSION, type ActionId, type Driver, type LivLivErrorCode, type LoadOptions, type LoadProgress, type ModelInfo, type PlaybackPose, type View } from '${name}'
 import { preloadFaceModel, startFaceTracking, TrackingFilter, parameterRule, readTrackingProfile, TRACKING_PARAMETERS, type TrackingParameter, type TrackingProfile, type ParameterRule, type FaceTracking } from '${name}/tracking'
-import { createSpeech, startLipSync, type LipSync } from '${name}/voice'
+import { createSpeech, startLipSync, type ClipHooks, type LipSync } from '${name}/voice'
 import { BODY_LIMIT, BodyPlayer, LivLivError as FromBody, type Body } from '${name}/body'
 import { PngBody } from '${name}/png'
 import { VrmBody } from '${name}/vrm'
@@ -51,6 +51,10 @@ void [anchor?.rotation, anchor?.scale, bodyAnchor?.x]
 // @ts-expect-error only the two documented attachment points are available
 player.getAnchor('hand')
 player.use(driver)
+const hooks: ClipHooks = { onEnd() {}, onFail() {} }
+createSpeech(player).say(new Response(new Blob()), hooks)
+const pose: PlaybackPose = { ...player.getPose(), crouch: -0.02, dip: 0, talk: 0 }
+player.renderPose(pose, 1 / 30, [640, 960])
 void [VERSION, model, view, tracking, sync, preloadFaceModel(), createSpeech(player), BODY_LIMIT, bodyPlayer, new VrmBody()]
 // the expressions getter keeps the model's label fields on both players (issue #8): label is a string, labels a map
 const playerLabels: string[] = player.expressions.map((e) => e.label)
