@@ -231,7 +231,13 @@ export class VrmBody implements Body {
     if (vrm.lookAt) { vrm.lookAt.yaw = P.eyeBallX * 25; vrm.lookAt.pitch = -P.eyeBallY * 15 }
     vrm.update(dt)
     this.renderer.render(this.scene, this.camera)
-    // Project the actual posed bones, so attachments follow the same model and camera.
+    // where the head is now, for the pointer
+    const p = new THREE.Vector3()
+    b.head?.getWorldPosition(p)
+    p.y += 0.06
+    p.project(this.camera)
+    this.headAt = { x: (p.x + 1) / 2, y: (1 - p.y) / 2 }
+    // attachment points: the posed bones, through the same camera
     for (const name of ['head', 'body'] as const) {
       const bone = name === 'head' ? b.head : b.chest ?? b.spine
       if (!bone) { delete this.anchors[name]; continue }
@@ -241,8 +247,6 @@ export class VrmBody implements Body {
       }
       this.anchors[name] = projectedAnchor(point(0), point(this.frame.height * (name === 'head' ? .1 : .2) * s), h / w)
     }
-    const head = this.anchors.head
-    if (head) this.headAt = { x: head.x, y: head.y }
   }
 
   head() { return { ...this.headAt, rx: 0.14, ry: 0.1 } }
