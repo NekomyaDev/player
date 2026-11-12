@@ -636,8 +636,10 @@ export class Puppet {
       }
     }
     this.tuning = { ...defaultTuning(), ...(model.tuning || {}) }
+    // the chest spring (rig.body.bust) is off for every model, as on livliv.ai: a value saved in a model is not applied.
+    // Breathing stays, with the chest lift every other figure has
     this.rig = { ...defaultRig(), ...(model.rig || {}), hair: { ...defaultRig().hair, ...(model.rig?.hair || {}) },
-      body: { ...defaultRig().body, ...(model.rig?.body || {}) } }
+      body: { ...defaultRig().body, ...(model.rig?.body || {}), bust: 0 } }
     this.expr = {}
     this.resetMouth(); this.talkLeft = 0
     this.cutBottom = model.anchors.bottom_y >= model.canvas[1] - 4

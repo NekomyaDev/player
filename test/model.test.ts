@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 import { FORMAT_VERSION, PARAM_RANGES, VERSION, defaultParams } from '../src/index'
-import { FORMAT, LEGACY_FORMAT, Puppet, type ModelDef } from '../src/runtime/puppet'
+import { FORMAT, LEGACY_FORMAT, Puppet, readModel, type ModelDef } from '../src/runtime/puppet'
 
 describe('params', () => {
   it('has a range for every param, and the defaults lie in them', () => {
@@ -43,6 +43,21 @@ describe('format check', () => {
       layers: [{ id: 'body', name: 'body', texture: 'textures/body.png', x: 0, y: 0, w: 64, h: 64, group: 'body', depth: 0 }],
     } as unknown as ModelDef
     await assert.rejects(load(v3), /no images/)
+  })
+})
+
+describe('rig', () => {
+  it('keeps the chest spring off whatever the model saved', () => {
+    const model = readModel(JSON.parse(readFileSync(new URL('./fixtures/example-k01.model.json', import.meta.url), 'utf8')))
+    assert.ok(model.rig!.body!.bust! > 0, 'the fixture saves one')
+    // the model's fields without the GPU: each layer stands in for what buildLayer makes of it
+    const p = Object.assign(Object.create(Puppet.prototype) as Puppet, {
+      procJaw: 0, lidCurve: false, chains: {}, drive: {}, buildLayer: (def: unknown) => ({ def, rest: new Float32Array(0) }),
+    })
+    const build = (p as unknown as { build: (m: ModelDef, imgs: unknown[], k: undefined, built: unknown[]) => void }).build
+    build.call(p, model, model.layers.map(() => ({ main: {}, frames: [] })), undefined, [])
+    assert.equal(p.rig.body.bust, 0)
+    assert.equal(p.rig.body.yaw, model.rig!.body!.yaw ?? 0.35, 'the rest of rig.body is the model\'s')
   })
 })
 

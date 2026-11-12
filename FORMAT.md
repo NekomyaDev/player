@@ -285,7 +285,7 @@ Changes:
 | `hair_limit`, `hair_drive` | how far hair may swing; how much the head's own acceleration throws each chain |
 | `wind`, `breath`, `sway`, `brow` | idle wind, breathing, sway and brow motion |
 | `pitch_ease` | how much a nod eases off toward its ends |
-| `body` | `yaw`, `roll`: how much the torso follows the head; `breath`; `bust`: the chest spring (0: none) |
+| `body` | `yaw`, `roll`: how much the torso follows the head; `breath`; `bust`: the chest spring, which LivLiv writes as 0 and players read as 0 whatever it says (LivLiv Player from 0.4) |
 | `neck` | `twist`, `reach`: the neck twisting with the head |
 | `jaw` | the jaw drop for a model whose frames measured none |
 | `chains` | pieces that swing on their own: a rope of `points` (root first) with `k`, `damp`, `drive`, `hang`, `wind`, `freq`, `limit`, `sigma`, `reach`, `bias` |
