@@ -189,7 +189,7 @@ WebGL2 và ES2023: Chrome / Edge 97+, Firefox 104+, Safari 15.4+. Đã kiểm tr
 ## Giấy phép
 
 Code thuộc [Giấy phép Apache 2.0](LICENSE) (xem thêm [NOTICE](NOTICE)). Các nhân vật nổi bật có
-giấy phép riêng, [characters/LICENSE.md](characters/LICENSE.md). Không giấy phép nào trong hai giấy phép trên bao hàm tên và logo LivLiv.
+giấy phép riêng, [characters/LICENSE.md](characters/LICENSE.md). Bạn có thể giữ tên và logo LivLiv trong phiên bản của mình, miễn là không tự nhận là bản chính thức.
 
 ## Cảm ơn
 

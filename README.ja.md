@@ -153,7 +153,7 @@ WebGL2 と ES2023 が必要です：Chrome / Edge 97+、Firefox 104+、Safari 15
 
 ## ライセンス
 
-コードは [Apache License 2.0](LICENSE) です（[NOTICE](NOTICE) も参照）。厳選キャラクターには別のライセンス [characters/LICENSE.md](characters/LICENSE.md) があります。どちらのライセンスも LivLiv の名称とロゴには及びません。
+コードは [Apache License 2.0](LICENSE) です（[NOTICE](NOTICE) も参照）。厳選キャラクターには別のライセンス [characters/LICENSE.md](characters/LICENSE.md) があります。LivLiv の名前とロゴは、公式版を名乗らない限り、あなたのバージョンでもそのまま使えます。
 
 ## 謝辞
 

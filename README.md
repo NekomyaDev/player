@@ -192,7 +192,7 @@ WebGL2 and ES2023: Chrome / Edge 97+, Firefox 104+, Safari 15.4+. Tested on curr
 ## License
 
 The code is under the [Apache License 2.0](LICENSE) (see also [NOTICE](NOTICE)). The featured characters have their
-own licence, [characters/LICENSE.md](characters/LICENSE.md). Neither licence covers the LivLiv name and logos.
+own licence, [characters/LICENSE.md](characters/LICENSE.md). You may keep the LivLiv name and logo in your own versions, as long as they don't claim to be the official one.
 
 ## Thanks
 

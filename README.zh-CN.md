@@ -155,7 +155,7 @@ npm run test:engines   # 在 Firefox 和 WebKit 上跑一个小样本，机器�
 
 ## 许可
 
-代码采用 [Apache License 2.0](LICENSE)（另见 [NOTICE](NOTICE)）。精选角色有自己的许可：[characters/LICENSE.md](characters/LICENSE.md)。两份许可都不包括 LivLiv 的名称和标志。
+代码采用 [Apache License 2.0](LICENSE)（另见 [NOTICE](NOTICE)）。精选角色有自己的许可：[characters/LICENSE.md](characters/LICENSE.md)。你的版本可以继续用 LivLiv 的名字和标志，只要不自称官方版本。
 
 ## 致谢
 
