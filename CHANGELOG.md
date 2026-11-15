@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.1
+
+Two optional settings for how strongly a character moves. A page that doesn't use them draws exactly as with 0.5.0.
+
+### New
+
+- `act(action, strength)`: a short move at a share of its full size, from 0 to 1 (default 1). It takes as long as
+  before. See [API.md](API.md#motion-strength).
+- `bodyMotion` (0 to 1, default 1): scales the live torso turn and lean, before `parameterProfile`. Recorded poses
+  already include it, so replaying them doesn't scale them again.
+- The repository's featured characters now include four full-body ones: Tsubaki, Neve, Juno and Viola.
+
+### Changed
+
+- The package builds itself when it is installed straight from GitHub (`prepare` instead of `prepack`), so
+  `npm install github:livliv-dev/player#<commit>` gives a working copy.
+
 ## 0.5.0
 
 Full-body characters, standing on the ground, with a choice of shot. Half-body characters draw exactly as in 0.4, and a
