@@ -101,6 +101,6 @@
     "test:browser": "node test/smoke.mjs",
     "test:engines": "node test/smoke.mjs firefox && node test/smoke.mjs webkit",
     "prepublishOnly": "npm run check && npm test",
-    "prepack": "npm run build"
+    "prepare": "npm run build"
   }
 }

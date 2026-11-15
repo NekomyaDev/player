@@ -177,7 +177,7 @@ not a number counts as the default.
 
 - `setExpression(id, weight = 1): boolean`: eases over to that expression (ids from `expressions`; `null` = neutral).
   Returns false for an id the model doesn't have.
-- `act(action)`: a short move over whatever else drives the character: `'nod'`, `'shake'`, `'tilt'`, `'hop'`, `'shy'`.
+- `act(action, strength = 1)`: a short move over whatever else drives the character: `'nod'`, `'shake'`, `'tilt'`, `'hop'`, `'shy'`.
 - `setAway(on)`: dozes (eyes closed, head down, a slow breath, expressions hidden), easing in, until `setAway(false)`.
 - `lookAt(x, y)`: looks toward a point, each -1..1 from the canvas center (y up), and keeps looking there instead
   of following the pointer; `lookAt(null)` goes back to the pointer. Needs `idle`.
@@ -590,3 +590,7 @@ the shoulders' for the torso) as a share of the canvas's width. Call it after a 
 before the model's first frame, and for a point a body does not have. The point moves with actions, the view and the
 body's own motion (on a full-body character, its sway, crouch and dip too); it is a point and an angle, not a skeleton, and does not bend what you put there. A `Body` of your
 own can have `anchor(name)`; without it only `'head'` is there, from its `head()`.
+
+### Motion strength
+
+`act(action, strength = 1)` scales action offsets and picture movement, from 0 to 1, without changing the duration. `bodyMotion` (0..1, default 1) scales live torso turn and lean before `parameterProfile`. Recorded final poses already include both scales; replay does not apply them again.

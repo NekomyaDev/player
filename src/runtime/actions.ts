@@ -32,7 +32,7 @@ const AWAY: Partial<Params> = { eyeLOpen: 0, eyeROpen: 0, angleY: -11, angleZ: 5
 
 export class ActionPlayer {
   /** out: seconds since it was replaced by the same action pressed again (it fades out over 0.15 s), else -1 */
-  private playing: { id: Exclude<ActionId, 'away'>; t: number; out: number }[] = []
+  private playing: { id: Exclude<ActionId, 'away'>; t: number; out: number; strength: number }[] = []
   /** away: on; auto: entered because no face was seen (leaves by itself when one is back) */
   away = false
   auto = false
@@ -43,10 +43,10 @@ export class ActionPlayer {
   /** the character stands on a ground line (a full-body model): the hop lands with a dip */
   grounded = false
 
-  play(id: ActionId) {
+  play(id: ActionId, strength = 1) {
     if (id === 'away') { this.setAway(!this.away); return }
     for (const p of this.playing) if (p.id === id && p.out < 0) p.out = 0  // pressed again: the running one fades out
-    this.playing.push({ id, t: 0, out: -1 })
+    this.playing.push({ id, t: 0, out: -1, strength: Number.isFinite(strength) ? Math.max(0, Math.min(1, strength)) : 1 })
   }
   setAway(on: boolean, auto = false) { this.away = on; this.auto = on && auto }
   get busy() { return this.playing.length > 0 || this.awayW > 0 }
@@ -59,7 +59,7 @@ export class ActionPlayer {
     for (const p of this.playing) {
       p.t += dt
       if (p.out >= 0) p.out += dt
-      const m = curve(p.id, Math.min(p.t, DUR[p.id]), this.grounded), f = p.out < 0 ? 1 : 1 - smooth(0, 0.15, p.out)
+      const m = curve(p.id, Math.min(p.t, DUR[p.id]), this.grounded), f = p.strength * (p.out < 0 ? 1 : 1 - smooth(0, 0.15, p.out))
       for (const [k, v] of Object.entries(m.offsets) as [keyof Params, number][]) o[k] = (o[k] ?? 0) + v * f
       this.y += m.y * f
     }

@@ -24,11 +24,14 @@ test('a recorded final pose replays at exact output dimensions without drivers o
   const player = new BodyPlayer(canvas, body, { autoplay: false, idle: false, followPointer: false })
   await player.load(new Map([['model', new Blob(['test'])]]))
   let drivers = 0, observed = 0
-  player.use({ update(frame) { drivers++; frame.params.angleX = 12; frame.params.mouthOpen = 0.7; frame.move.x = 0.1 } })
+  player.use({ update(frame) { drivers++; frame.params.angleX = 12; frame.params.bodyX = 6; frame.params.bodyZ = 4; frame.params.mouthOpen = 0.7; frame.move.x = 0.1 } })
   player.onFrame = (pose) => { observed++; pose.params.angleX = 99 }
+  player.bodyMotion = 0.8
   player.setExpression('happy'); player.act('hop'); player.play()
   for (let i = 0; i < 5; i++) { now += 16; next(now) }
   player.pause()
+  assert.ok(Math.abs(player.getPose().params.bodyX - 4.8) < 1e-9, 'body motion scales the final live torso pose')
+  assert.equal(player.getPose().params.bodyZ, 3.2)
   assert.equal(observed, 5)
   assert.equal(player.getPose().params.angleX, 12, 'an empty profile preserves the existing driver result')
   player.parameterProfile = { angleX: { input: [-15, 15], output: [-30, 30], smoothing: 0, curve: 1 }, mouthOpen: { input: [0, .7], output: [0, 1], smoothing: 0, curve: 1 } }

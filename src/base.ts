@@ -182,6 +182,8 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
   readonly params: Params = defaultParams()
   /** see PlayerOptions.idle */
   idle: boolean
+  /** Scale torso turn and lean before the user parameter mapping (0..1). Replayed poses are already scaled. */
+  bodyMotion = 1
   /** see PlayerOptions.followPointer */
   followPointer: 'page' | 'canvas' | false
   /** see PlayerOptions.renderWhenHidden */
@@ -383,9 +385,9 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
   }
 
   /** Plays a short move over whatever drives the character: nod, shake, tilt, hop, shy */
-  act(action: ActionId) {
+  act(action: ActionId, strength = 1) {
     if ((action as string) === 'away') throw new TypeError("LivLiv: act('away') is setAway(true) now")
-    this.actions.play(action)
+    this.actions.play(action, strength)
   }
 
   /** Dozes (eyes closed, head down, a slow breath, expressions hidden), easing in, until setAway(false) */
@@ -520,6 +522,8 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
     this.was = { tracked: f.tracked, mouth: P.mouthOpen }
     A.grounded = f.grounded
     f.add(A.update(dt))
+    const body = Number.isFinite(this.bodyMotion) ? clamp(this.bodyMotion, 0, 1) : 1
+    P.bodyX *= body; P.bodyZ *= body
     if (this.smile) P.smile = Math.max(P.smile, this.smile)
     if (A.awayW) for (const [k, v] of Object.entries(A.awayPose(t)) as [keyof Params, number][]) P[k] += (v - P[k]) * A.awayW
     inRange(P)

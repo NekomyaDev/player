@@ -22,6 +22,20 @@ const outOfRange = (P: Params) => {
 const max = (xs: ArrayLike<number>) => Math.max(...Array.from(xs))
 
 describe('actions', () => {
+  it('scales head, body and picture movement without changing the action timing', () => {
+    for (const grounded of [false, true]) for (const id of ['nod', 'shake', 'tilt', 'hop', 'shy'] as const) {
+      const full = new ActionPlayer(), soft = new ActionPlayer()
+      full.grounded = soft.grounded = grounded
+      full.play(id); soft.play(id, 0.4)
+      for (let i = 0; i < 180; i++) {
+        const a = { ...full.update(1 / 60) }, b = soft.update(1 / 60)
+        for (const [key, value] of Object.entries(a)) assert.ok(Math.abs((b[key as keyof Params] ?? 0) - value * 0.4) < 1e-9)
+        assert.ok(Math.abs(soft.y - full.y * 0.4) < 1e-9)
+        assert.equal(soft.busy, full.busy)
+      }
+    }
+  })
+
   for (const id of ['nod', 'shake', 'tilt', 'hop', 'shy'] as const) {
     it(`${id} moves, then ends with nothing left`, () => {
       const a = new ActionPlayer()
