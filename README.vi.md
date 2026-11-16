@@ -105,8 +105,8 @@ và độ nhún: xem [Full-body characters](API.md#full-body-characters) trong A
 
 ## Nhân vật nổi bật
 
-`characters/` có 25 nhân vật, sẵn sàng để `load()`; 4 nhân vật f05–f08 là nhân vật toàn thân. Các nhân vật này **không** thuộc phạm vi Giấy phép Apache. Hầu hết do LivLiv tạo ra: bạn được dùng miễn phí cho dự án cá nhân, phi thương mại kèm ghi công
-("Characters: LivLiv (livliv.ai)"); không được bán, dùng thương mại hay dùng các nhân vật này để huấn luyện mô hình AI. Nana là
+`characters/` có 25 nhân vật, sẵn sàng để `load()`; 4 nhân vật f05–f08 là nhân vật toàn thân. Các nhân vật này **không** thuộc phạm vi Giấy phép Apache. Hầu hết do LivLiv tạo ra: bạn được dùng miễn phí kèm ghi công ("Characters: LivLiv (livliv.ai)"), cá nhân
+cũng được dùng thương mại; không được bán chính các nhân vật hay hàng hóa làm từ chúng, và không được dùng chúng để huấn luyện mô hình AI. Nana là
 linh vật của LivLiv. Điều khoản có trong [characters/LICENSE.md](characters/LICENSE.md).
 
 Kujira, Kujira Q và Pen dựa trên tác phẩm của người khác: giấy phép và cách ghi công nêu trên không áp dụng cho các nhân vật này. Nguồn,

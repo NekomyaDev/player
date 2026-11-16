@@ -98,7 +98,7 @@ player.view.fit = 'whole'   // 'frame'（头和上身，默认）、'knee'（到
 
 ## 精选角色
 
-`characters/` 里有 25 个角色，可以直接 `load()`，其中 f05–f08 这 4 个是全身角色。它们**不**适用 Apache 许可。大部分由 LivLiv 制作：个人非商业用途可以免费使用，请署名（「角色：LivLiv（livliv.ai）」）；不能出售、不能商用、不能用来训练 AI 模型。Nana 是 LivLiv 的吉祥物。完整条款见 [characters/LICENSE.md](characters/LICENSE.md)。
+`characters/` 里有 25 个角色，可以直接 `load()`，其中 f05–f08 这 4 个是全身角色。它们**不**适用 Apache 许可。大部分由 LivLiv 制作：可以免费使用，个人也可以商用，请署名（「角色：LivLiv（livliv.ai）」）；不能出售角色本身或做成周边出售，不能用来训练 AI 模型。Nana 是 LivLiv 的吉祥物。完整条款见 [characters/LICENSE.md](characters/LICENSE.md)。
 
 Kujira、Kujira Q 和 Pen 来自别人的作品，不适用上面的许可和署名。它们的来源、署名和条款见 [characters/CREDITS.md](characters/CREDITS.md)。
 

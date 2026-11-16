@@ -86,7 +86,7 @@ misspelt field is caught instead of silently doing nothing. The same holds insid
 
 LivLiv writes two licences today: `LicenseRef-LivLiv-Terms` (a character exported by its owner, used as far as the
 owner's plan allows; [livliv.ai/terms](https://livliv.ai/terms)) and `LicenseRef-LivLiv-Samples` (the featured
-characters shipped with LivLiv Stage and LivLiv Player: free for non-commercial use with credit; the full text is
+characters shipped with LivLiv Stage and LivLiv Player: free with credit, commercial use by individuals included; the full text is
 `LICENSE.md` beside them).
 
 ### The watermark

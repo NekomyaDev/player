@@ -96,7 +96,7 @@ player.view.fit = 'whole'   // 'frame'（頭と胸まで、既定）、'knee'（
 
 ## 厳選キャラクター
 
-`characters/` には 25 体のキャラクターが入っていて、そのまま `load()` できます（f05〜f08 の 4 体は全身）。これらには Apache License は**適用されません**。大半は LivLiv が制作したもので、個人の非商用利用は、クレジット（「キャラクター：LivLiv（livliv.ai）」）を入れれば無料です。販売、商用利用、AI モデルの学習には使えません。Nana は LivLiv のマスコットです。条文は [characters/LICENSE.md](characters/LICENSE.md) をご覧ください。
+`characters/` には 25 体のキャラクターが入っていて、そのまま `load()` できます（f05〜f08 の 4 体は全身）。これらには Apache License は**適用されません**。大半は LivLiv が制作したもので、クレジット（「キャラクター：LivLiv（livliv.ai）」）を入れれば無料で使え、個人なら商用利用もできます。キャラクター自体やグッズの販売、AI モデルの学習には使えません。Nana は LivLiv のマスコットです。条文は [characters/LICENSE.md](characters/LICENSE.md) をご覧ください。
 
 Kujira、Kujira Q、Pen は他の方の作品に基づくもので、上記のライセンスとクレジットは適用されません。出典、クレジット、条件は [characters/CREDITS.md](characters/CREDITS.md) をご覧ください。
 

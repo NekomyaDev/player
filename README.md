@@ -106,8 +106,8 @@ dip: see [Full-body characters](API.md#full-body-characters) in API.md.
 ## Featured characters
 
 `characters/` holds 25 characters, ready to `load()`; four of them (f05–f08) are full-body. They are **not** covered by
-the Apache License. Most were made by LivLiv: use those free for personal, non-commercial projects with credit
-("Characters: LivLiv (livliv.ai)"); don't sell them, use them commercially or train AI models on them. Nana is
+the Apache License. Most were made by LivLiv: use those free with credit ("Characters: LivLiv (livliv.ai)"), commercially too
+if you are an individual; don't sell them or merchandise made from them, and don't train AI models on them. Nana is
 LivLiv's mascot. The terms are in [characters/LICENSE.md](characters/LICENSE.md).
 
 Kujira, Kujira Q and Pen come from other people's work: that licence and that credit don't cover them. Their sources,
