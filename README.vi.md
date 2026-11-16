@@ -33,8 +33,8 @@
 
 Chúng tôi mong ai cũng có thể tạo nên nhân vật từ trí tưởng tượng của chính mình.
 
-Chúng tôi đang mở mã nguồn cho bộ công cụ tạo nhân vật bằng AI, trình phát và giao thức phát đi kèm,
-cùng một sân khấu để những nhân vật ấy ra mắt khán giả.
+Chúng tôi đang mở mã nguồn cho bộ công cụ tạo nhân vật bằng AI, [trình phát và giao thức phát đi kèm](https://github.com/livliv-dev/player),
+cùng [một sân khấu để những nhân vật ấy ra mắt khán giả](https://github.com/livliv-dev/stage).
 
 Ghé [Discord](https://discord.gg/ac5qF36T2H) trò chuyện với chúng tôi và theo dõi LivLiv trên [X (Twitter)](https://x.com/livliv_ai) nhé.
 
@@ -88,33 +88,13 @@ giới hạn khi đọc file không đáng tin cậy, gói model và phiên bả
 > Gói npm chỉ có trình phát. Các nhân vật nổi bật nằm trong [`characters/`](characters/) của repository này: hãy sao chép
 > những nhân vật bạn dùng, kèm giấy phép, vào cạnh trang của bạn.
 
-## Nhân vật toàn thân
-
-<p align="center"><img src="media/full-body.webp" alt="Tsubaki, Neve, Juno và Viola, bốn nhân vật nổi bật toàn thân" width="560"></p>
-
-Nhân vật toàn thân được vẽ từ đầu đến chân và đứng trên mặt đất. Phần thân trên cử động như nhân vật nửa người; cả
-cơ thể lắc lư quanh mắt cá chân, hông dịch trọng tâm, vạt váy chuyển động theo sau, và khi nhảy hoặc nghiêng về phía
-camera thì nhân vật khuỵu gối trong khi chân vẫn đứng yên. Chọn khung hình bằng `view.fit`:
-
-```js
-player.view.fit = 'whole'   // 'frame' (đầu và ngực, mặc định), 'knee' (đến đầu gối) hoặc 'whole' (toàn thân)
-```
-
-Driver đọc được `frame.grounded` và có thể nhún phần thân trên bằng `frame.talk`; tư thế được ghi lại vẫn giữ độ khuỵu
-và độ nhún: xem [Full-body characters](API.md#full-body-characters) trong API.md.
-
 ## Nhân vật nổi bật
 
-`characters/` có 25 nhân vật, sẵn sàng để `load()`; 4 nhân vật f05–f08 là nhân vật toàn thân. Các nhân vật này **không** thuộc phạm vi Giấy phép Apache. Hầu hết do LivLiv tạo ra: bạn được dùng miễn phí kèm ghi công ("Characters: LivLiv (livliv.ai)"), cá nhân
-cũng được dùng thương mại; không được bán chính các nhân vật hay hàng hóa làm từ chúng, và không được dùng chúng để huấn luyện mô hình AI. Nana là
-linh vật của LivLiv. Điều khoản có trong [characters/LICENSE.md](characters/LICENSE.md).
+`characters/` có 25 nhân vật, sẵn sàng để `load()`. Hầu hết do LivLiv tạo ra: bạn được dùng miễn phí kèm ghi công ("Characters: LivLiv (livliv.ai)"), cá nhân cũng được dùng thương mại; không được bán chính các nhân vật hay hàng hóa làm từ chúng, và không được dùng chúng để huấn luyện mô hình AI. Các nhân vật này **không** thuộc phạm vi Giấy phép Apache; điều khoản có trong [characters/LICENSE.md](characters/LICENSE.md). Kujira, Kujira Q và Pen dựa trên tác phẩm của người khác, với điều khoản riêng trong [characters/CREDITS.md](characters/CREDITS.md).
 
-Kujira, Kujira Q và Pen dựa trên tác phẩm của người khác: giấy phép và cách ghi công nêu trên không áp dụng cho các nhân vật này. Nguồn,
-ghi công và điều khoản của các nhân vật này có trong [characters/CREDITS.md](characters/CREDITS.md).
+**Mới trong 0.5.0: nhân vật toàn thân.** Được vẽ từ đầu đến chân và đứng trên mặt đất, nhân vật lắc lư, khuỵu gối và nhún phần thân trên khi nói mà chân vẫn giữ nguyên. Bốn nhân vật nổi bật là nhân vật toàn thân: Tsubaki, Neve, Juno và Viola (f05–f08). Chọn khung hình bằng `player.view.fit`: `'frame'` (mặc định), `'knee'` hoặc `'whole'`; xem [Full-body characters](API.md#full-body-characters) trong API.md.
 
-Mỗi nhân vật còn có một `cover.webp` (512 x 768, khoảng 50 KB; với nhân vật toàn thân là 512 x 1024, cả người), là khung hình đầu tiên của nhân vật. `player.load(source, { poster })`
-hiện ảnh này trên canvas cho đến khung hình đầu tiên. Muốn có ảnh trước khi script chạy, hãy đặt ảnh này phía sau canvas với
-`object-fit: contain` rồi cho nhân vật hiện dần lên trên nó, như [example/loading.js](example/loading.js) đã làm.
+Mỗi nhân vật có một `cover.webp`, là khung hình đầu tiên: `player.load(source, { poster })` hiện ảnh này cho đến khi nhân vật sẵn sàng, và [example/loading.js](example/loading.js) cho thấy cách hiện nó trước khi script chạy.
 
 | id | tên | id | tên | id | tên |
 |---|---|---|---|---|---|

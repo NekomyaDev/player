@@ -34,7 +34,7 @@
 
 我们希望，创造角色这件事能属于每一个人。
 
-我们正在开源 AI 角色创作工具链、播放器与播放协议，还有一方舞台，让你创作的角色与大家见面。
+我们正在开源 AI 角色创作工具链、[播放器与播放协议](https://github.com/livliv-dev/player)，还有[一方舞台，让你创作的角色与大家见面](https://github.com/livliv-dev/stage)。
 
 欢迎来 [Discord](https://discord.gg/ac5qF36T2H) 聊聊角色创作，也可以在 [X（Twitter）](https://x.com/livliv_ai) 上关注我们。
 
@@ -84,25 +84,13 @@ await png.load({ closed: 'me-closed.png', open: 'me-open.png' })
 
 > npm 包里只有播放器。精选角色在这个仓库的 [`characters/`](characters/) 里，把要用的角色连同许可一起复制到你的页面旁边。
 
-## 全身角色
-
-<p align="center"><img src="media/full-body.webp" alt="Tsubaki、Neve、Juno、Viola，4 个全身精选角色" width="560"></p>
-
-全身角色从头画到脚，双脚站在地面上。上半身的动作和半身角色一样；整个人以脚踝为支点轻轻摆动，胯部会移动重心，裙摆跟在后面；跳起前或朝镜头前倾时会屈膝下蹲，脚不离地。用 `view.fit` 选取景：
-
-```js
-player.view.fit = 'whole'   // 'frame'（头和上身，默认）、'knee'（到膝盖）或 'whole'（整个人）
-```
-
-驱动可以读到 `frame.grounded`，用 `frame.talk` 让上身随说话下沉；录下的姿势会保留下蹲和下沉。详见 API.md 的 [Full-body characters](API.md#full-body-characters)。
-
 ## 精选角色
 
-`characters/` 里有 25 个角色，可以直接 `load()`，其中 f05–f08 这 4 个是全身角色。它们**不**适用 Apache 许可。大部分由 LivLiv 制作：可以免费使用，个人也可以商用，请署名（「角色：LivLiv（livliv.ai）」）；不能出售角色本身或做成周边出售，不能用来训练 AI 模型。Nana 是 LivLiv 的吉祥物。完整条款见 [characters/LICENSE.md](characters/LICENSE.md)。
+`characters/` 里有 25 个角色，可以直接 `load()`。大部分由 LivLiv 制作：署名（「角色：LivLiv（livliv.ai）」）就能免费使用，个人也可以商用；不能出售角色本身或做成周边出售，不能用来训练 AI 模型。它们**不**适用 Apache 许可，完整条款见 [characters/LICENSE.md](characters/LICENSE.md)。Kujira、Kujira Q 和 Pen 来自别人的作品，条款见 [characters/CREDITS.md](characters/CREDITS.md)。
 
-Kujira、Kujira Q 和 Pen 来自别人的作品，不适用上面的许可和署名。它们的来源、署名和条款见 [characters/CREDITS.md](characters/CREDITS.md)。
+**0.5.0 新增全身角色。** 全身角色从头画到脚，双脚站在地面上：会晃、会蹲，说话时上身轻轻一沉，脚不离地。精选角色里有 4 个全身角色：Tsubaki、Neve、Juno、Viola（f05–f08）。用 `player.view.fit` 选取景：`'frame'`（默认）、`'knee'` 或 `'whole'`，详见 API.md 的 [Full-body characters](API.md#full-body-characters)。
 
-每个角色还带一张 `cover.webp`（512 x 768，约 50 KB；全身角色是 512 x 1024 的整个人），是它的第一帧。`player.load(source, { poster })` 会在第一帧出来之前把它显示在画布上。如果想在脚本运行之前就有画面，就把它放在画布下面（`object-fit: contain`），角色好了再淡入，[example/loading.js](example/loading.js) 就是这样做的。
+每个角色都带一张 `cover.webp`，是它的第一帧：`player.load(source, { poster })` 会在角色准备好之前显示它；想在脚本运行前就显示，可以参考 [example/loading.js](example/loading.js)。
 
 角色列表见[英文 README](README.md#featured-characters)。
 

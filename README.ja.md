@@ -32,7 +32,7 @@
 
 誰もが、思い描いたキャラクターをかたちにできるように。それが私たちの願いです。
 
-AI を使ったキャラクター制作のツール群、プレイヤーとその再生プロトコル、そしてキャラクターをお披露目できる舞台をオープンソース化しています。
+AI を使ったキャラクター制作のツール群、[プレイヤーとその再生プロトコル](https://github.com/livliv-dev/player)、そして[キャラクターをお披露目できる舞台](https://github.com/livliv-dev/stage)をオープンソース化しています。
 
 ぜひ [Discord](https://discord.gg/ac5qF36T2H) に遊びに来てください。[X（Twitter）](https://x.com/livliv_ai) でも LivLiv をフォローしてもらえたらうれしいです。
 
@@ -82,25 +82,13 @@ API の全体は [API.md](API.md)（英語）にあります：オプション�
 
 > npm パッケージに入っているのはプレイヤーだけです。厳選キャラクターはこのリポジトリの [`characters/`](characters/) にあります。使うキャラクターをライセンスと一緒にページのそばにコピーしてください。
 
-## 全身のキャラクター
-
-<p align="center"><img src="media/full-body.webp" alt="Tsubaki、Neve、Juno、Viola：全身の厳選キャラクター 4 体" width="560"></p>
-
-全身のキャラクターは頭から足まで描かれ、地面に立っています。上半身は半身のキャラクターと同じように動き、体全体は足首を支点に揺れ、腰は重心を移し、スカートの裾は少し遅れてついてきます。ジャンプの前やカメラに身を乗り出したときは、足はそのままで膝を曲げてしゃがみます。表示範囲は `view.fit` で選べます。
-
-```js
-player.view.fit = 'whole'   // 'frame'（頭と胸まで、既定）、'knee'（膝まで）、'whole'（全身）
-```
-
-ドライバーは `frame.grounded` を読み、`frame.talk` で上半身を沈ませられます。記録したポーズにはしゃがみと沈みも残ります。詳しくは API.md の [Full-body characters](API.md#full-body-characters) をご覧ください。
-
 ## 厳選キャラクター
 
-`characters/` には 25 体のキャラクターが入っていて、そのまま `load()` できます（f05〜f08 の 4 体は全身）。これらには Apache License は**適用されません**。大半は LivLiv が制作したもので、クレジット（「キャラクター：LivLiv（livliv.ai）」）を入れれば無料で使え、個人なら商用利用もできます。キャラクター自体やグッズの販売、AI モデルの学習には使えません。Nana は LivLiv のマスコットです。条文は [characters/LICENSE.md](characters/LICENSE.md) をご覧ください。
+`characters/` には 25 体のキャラクターが入っていて、そのまま `load()` できます。大半は LivLiv が制作したもので、クレジット（「キャラクター：LivLiv（livliv.ai）」）を入れれば無料で使え、個人なら商用利用もできます。キャラクター自体やグッズの販売、AI モデルの学習には使えません。これらには Apache License は**適用されません**。条文は [characters/LICENSE.md](characters/LICENSE.md) をご覧ください。Kujira、Kujira Q、Pen は他の方の作品に基づくもので、条件は [characters/CREDITS.md](characters/CREDITS.md) にあります。
 
-Kujira、Kujira Q、Pen は他の方の作品に基づくもので、上記のライセンスとクレジットは適用されません。出典、クレジット、条件は [characters/CREDITS.md](characters/CREDITS.md) をご覧ください。
+**0.5.0 の新機能：全身のキャラクター。** 頭から足まで描かれ、地面に立っています。足を着けたまま揺れ、しゃがみ、話すと上半身が沈みます。厳選キャラクターのうち Tsubaki、Neve、Juno、Viola（f05〜f08）の 4 体が全身です。表示範囲は `player.view.fit` で `'frame'`（既定）、`'knee'`、`'whole'` から選べます。詳しくは API.md の [Full-body characters](API.md#full-body-characters) をご覧ください。
 
-各キャラクターには `cover.webp`（512 x 768、約 50 KB。全身のキャラクターは全身が入った 512 x 1024）もあります。最初のフレームです。`player.load(source, { poster })` を使うと、最初のフレームが出るまでキャンバスに表示されます。スクリプトが動く前から絵を出したいときは、キャンバスの下に `object-fit: contain` で置き、準備ができたらキャラクターをフェードインさせます（[example/loading.js](example/loading.js) がこの方法です）。
+各キャラクターには最初のフレームの `cover.webp` があります。`player.load(source, { poster })` を使うと、準備ができるまでそれを表示します。スクリプトが動く前から表示する方法は [example/loading.js](example/loading.js) にあります。
 
 キャラクターの一覧は[英語の README](README.md#featured-characters) にあります。
 

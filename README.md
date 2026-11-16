@@ -33,8 +33,8 @@
 
 We want the art of creating characters to belong to everyone.
 
-We're open-sourcing our AI tools for character creation, the player and its playback protocol, and a stage
-where your characters can meet an audience.
+We're open-sourcing our AI tools for character creation, [the player and its playback protocol](https://github.com/livliv-dev/player),
+and [a stage where your characters can meet an audience](https://github.com/livliv-dev/stage).
 
 Come say hello on [Discord](https://discord.gg/ac5qF36T2H) and follow us on [X (Twitter)](https://x.com/livliv_ai).
 
@@ -88,35 +88,21 @@ are described in [FORMAT-v3.md](FORMAT-v3.md) and still play.
 > The npm package is the player alone. The featured characters are in this repository's [`characters/`](characters/): copy
 > the ones you use next to your page, with their licence.
 
-## Full-body characters
-
-<p align="center"><img src="media/full-body.webp" alt="Tsubaki, Neve, Juno and Viola, four full-body featured characters" width="560"></p>
-
-A full-body character is drawn head to feet and stands on the ground. Its upper body moves as a half-body character's;
-the whole figure sways from the ankles, the hips shift their weight, a skirt's hem trails behind, and a hop or a lean
-toward the camera crouches it while the feet stay put. Pick the shot with `view.fit`:
-
-```js
-player.view.fit = 'whole'   // 'frame' (head and chest, the default), 'knee' or 'whole'
-```
-
-Drivers see `frame.grounded` and can dip the upper body with `frame.talk`, and a recorded pose keeps the crouch and the
-dip: see [Full-body characters](API.md#full-body-characters) in API.md.
-
 ## Featured characters
 
-`characters/` holds 25 characters, ready to `load()`; four of them (f05–f08) are full-body. They are **not** covered by
-the Apache License. Most were made by LivLiv: use those free with credit ("Characters: LivLiv (livliv.ai)"), commercially too
-if you are an individual; don't sell them or merchandise made from them, and don't train AI models on them. Nana is
-LivLiv's mascot. The terms are in [characters/LICENSE.md](characters/LICENSE.md).
+`characters/` holds 25 characters, ready to `load()`. Most were made by LivLiv: use them free with credit
+("Characters: LivLiv (livliv.ai)"), commercially too if you are an individual. Don't sell them or merchandise made from
+them, and don't train AI models on them. They are **not** covered by the Apache License; the terms are in
+[characters/LICENSE.md](characters/LICENSE.md). Kujira, Kujira Q and Pen come from other people's work, with their own
+terms in [characters/CREDITS.md](characters/CREDITS.md).
 
-Kujira, Kujira Q and Pen come from other people's work: that licence and that credit don't cover them. Their sources,
-credits and terms are in [characters/CREDITS.md](characters/CREDITS.md).
+**New in 0.5.0: full-body characters.** Drawn head to feet, they stand on the ground: they sway, crouch and dip while
+their feet stay put. Four featured characters are full-body: Tsubaki, Neve, Juno and Viola (f05–f08). Pick the shot
+with `player.view.fit`: `'frame'` (default), `'knee'` or `'whole'`; see
+[Full-body characters](API.md#full-body-characters) in API.md.
 
-Each also has a `cover.webp` (512 x 768, about 50 KB; a full-body character's is 512 x 1024, its whole figure), its
-first frame. `player.load(source, { poster })`
-shows it on the canvas until the first frame. To have it before any script has run, put it under the canvas with
-`object-fit: contain` and fade the character in over it, as [example/loading.js](example/loading.js) does.
+Each character has a `cover.webp`, its first frame: `player.load(source, { poster })` shows it until the character is
+ready, and [example/loading.js](example/loading.js) shows it before any script has run.
 
 | id | name | id | name | id | name |
 |---|---|---|---|---|---|
