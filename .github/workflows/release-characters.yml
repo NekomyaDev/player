@@ -28,6 +28,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ env.TAG }}
+          persist-credentials: false   # the install and build below never see the write token
       - uses: actions/setup-node@v5
         with:
           node-version: 24
