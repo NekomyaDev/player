@@ -90,7 +90,7 @@ API の全体は [API.md](API.md)（英語）にあります：オプション�
 
 各キャラクターには最初のフレームの `cover.webp` があります。`player.load(source, { poster })` を使うと、準備ができるまでそれを表示します。スクリプトが動く前から表示する方法は [example/loading.js](example/loading.js) にあります。
 
-キャラクターの一覧は[英語の README](README.md#featured-characters) にあります。
+各キャラクターは 1 つのファイル `<id>.livliv` としてもダウンロードできます。場所は `https://livliv-dev.github.io/player/characters/<id>.livliv` です。CORS 付きで配信しているので、別のサイトのページからもそこから直接 `load()` できます。全キャラクターの一覧は [`index.json`](https://livliv-dev.github.io/player/characters/index.json) にあります。キャラクターの一覧とダウンロードリンクは[英語の README](README.md#featured-characters) にあります。
 
 ## 自分のキャラクター
 

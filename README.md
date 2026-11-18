@@ -104,17 +104,21 @@ with `player.view.fit`: `'frame'` (default), `'knee'` or `'whole'`; see
 Each character has a `cover.webp`, its first frame: `player.load(source, { poster })` shows it until the character is
 ready, and [example/loading.js](example/loading.js) shows it before any script has run.
 
+Each character is also one file to download, `<id>.livliv`, at `https://livliv-dev.github.io/player/characters/<id>.livliv`
+(the names below link to them). They are served with CORS, so a page on another site can `load()` one straight from
+there, and [`index.json`](https://livliv-dev.github.io/player/characters/index.json) lists them all.
+
 | id | name | id | name | id | name |
 |---|---|---|---|---|---|
-| `k01` | Sena | `d01` | Yui | `v01` | Aster |
-| `k02` | Elio | `d02` | Leo | `v03` | Mira |
-| `char06` | Aoi | `d03` | Nana | `v04` | Kai |
-| `char07` | Sora | `d03ft` | Nana (refined) | `v05` | Lilith |
-| `s01` | Hana | `p01` | Kujira | `v06` | Usa |
-| `q02` | Mochi | `p02` | Kujira Q | `v07` | Stella |
-| `q03` | Kotaro | `p03` | Pen | `w01` | Max |
-| `f05` | Tsubaki (full-body) | `f06` | Neve (full-body) | `f07` | Juno (full-body) |
-| `f08` | Viola (full-body) | | | | |
+| `k01` | [Sena](https://livliv-dev.github.io/player/characters/k01.livliv) | `d01` | [Yui](https://livliv-dev.github.io/player/characters/d01.livliv) | `v01` | [Aster](https://livliv-dev.github.io/player/characters/v01.livliv) |
+| `k02` | [Elio](https://livliv-dev.github.io/player/characters/k02.livliv) | `d02` | [Leo](https://livliv-dev.github.io/player/characters/d02.livliv) | `v03` | [Mira](https://livliv-dev.github.io/player/characters/v03.livliv) |
+| `char06` | [Aoi](https://livliv-dev.github.io/player/characters/char06.livliv) | `d03` | [Nana](https://livliv-dev.github.io/player/characters/d03.livliv) | `v04` | [Kai](https://livliv-dev.github.io/player/characters/v04.livliv) |
+| `char07` | [Sora](https://livliv-dev.github.io/player/characters/char07.livliv) | `d03ft` | [Nana (refined)](https://livliv-dev.github.io/player/characters/d03ft.livliv) | `v05` | [Lilith](https://livliv-dev.github.io/player/characters/v05.livliv) |
+| `s01` | [Hana](https://livliv-dev.github.io/player/characters/s01.livliv) | `p01` | [Kujira](https://livliv-dev.github.io/player/characters/p01.livliv) | `v06` | [Usa](https://livliv-dev.github.io/player/characters/v06.livliv) |
+| `q02` | [Mochi](https://livliv-dev.github.io/player/characters/q02.livliv) | `p02` | [Kujira Q](https://livliv-dev.github.io/player/characters/p02.livliv) | `v07` | [Stella](https://livliv-dev.github.io/player/characters/v07.livliv) |
+| `q03` | [Kotaro](https://livliv-dev.github.io/player/characters/q03.livliv) | `p03` | [Pen](https://livliv-dev.github.io/player/characters/p03.livliv) | `w01` | [Max](https://livliv-dev.github.io/player/characters/w01.livliv) |
+| `f05` | [Tsubaki (full-body)](https://livliv-dev.github.io/player/characters/f05.livliv) | `f06` | [Neve (full-body)](https://livliv-dev.github.io/player/characters/f06.livliv) | `f07` | [Juno (full-body)](https://livliv-dev.github.io/player/characters/f07.livliv) |
+| `f08` | [Viola (full-body)](https://livliv-dev.github.io/player/characters/f08.livliv) | | | | |
 
 ## Characters of your own
 

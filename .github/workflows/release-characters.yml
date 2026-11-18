@@ -1,0 +1,43 @@
+# Each release carries the featured characters as .livliv packages (one file each, characters/<id>.livliv) and
+# characters/index.json, built from the release's own tree, for people who download them by hand. A web page loads them
+# from GitHub Pages instead (livliv-dev.github.io/player/characters/<id>.livliv): release files are sent without a CORS
+# header, so a browser refuses to fetch them from another site.
+#
+# Runs when a release is published. For a release made before this workflow: Actions → Release characters → Run
+# workflow, with its tag (v0.5.1).
+name: Release characters
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release's tag, for example v0.5.1"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - name: Attach the packages to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(ls characters/*.livliv | wc -l)
+          test "$count" -eq "$(node -e "console.log(require('./characters/index.json').length)")"
+          gh release upload "$TAG" characters/*.livliv characters/index.json --clobber --repo "$GITHUB_REPOSITORY"
+          echo "attached $count packages and index.json to $TAG"

@@ -92,7 +92,7 @@ await png.load({ closed: 'me-closed.png', open: 'me-open.png' })
 
 每个角色都带一张 `cover.webp`，是它的第一帧：`player.load(source, { poster })` 会在角色准备好之前显示它；想在脚本运行前就显示，可以参考 [example/loading.js](example/loading.js)。
 
-角色列表见[英文 README](README.md#featured-characters)。
+每个角色也是一个可以下载的单文件 `<id>.livliv`，地址是 `https://livliv-dev.github.io/player/characters/<id>.livliv`。它们带 CORS，别的网站上的页面也能直接从那里 `load()`；[`index.json`](https://livliv-dev.github.io/player/characters/index.json) 列出了全部角色。角色列表和下载链接见[英文 README](README.md#featured-characters)。
 
 ## 用自己的角色
 
