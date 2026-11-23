@@ -16,12 +16,13 @@ fs.rmSync(dir, { recursive: true, force: true })
 fs.mkdirSync(path.join(dir, 'node_modules', path.dirname(name)), { recursive: true })
 fs.symlinkSync(root, path.join(dir, 'node_modules', name), 'dir')
 fs.writeFileSync(path.join(dir, 'use.ts'), `
-import { LivLivError, Player, VERSION, type ActionId, type Driver, type Fit, type Frame, type LivLivErrorCode, type LoadOptions, type LoadProgress, type ModelInfo, type PlaybackPose, type View } from '${name}'
+import { LivLivError, Player, VERSION, modelFiles, packageModelJson, type ActionId, type Driver, type Fit, type Frame, type Host, type LivLivErrorCode, type LoadOptions, type LoadProgress, type ModelInfo, type PlaybackPose, type Tuning, type View } from '${name}'
 import { preloadFaceModel, startFaceTracking, TrackingFilter, parameterRule, readTrackingProfile, TRACKING_PARAMETERS, type TrackingParameter, type TrackingProfile, type ParameterRule, type FaceTracking } from '${name}/tracking'
 import { createSpeech, startLipSync, type ClipHooks, type LipSync } from '${name}/voice'
 import { BODY_LIMIT, BodyPlayer, LivLivError as FromBody, type Body } from '${name}/body'
 import { PngBody } from '${name}/png'
 import { VrmBody } from '${name}/vrm'
+import { Puppet, LIMITS, V, keyformsFit, readModel, LivelyIdle, IDLE_STYLE, FaceTracker, VoiceMeter, SpeechPlayer, TalkMotion, ActionPlayer, brand, type MeshView, type LayerHit, type Fit as RuntimeFit } from '${name}/runtime'
 declare const canvas: HTMLCanvasElement
 const player = new Player(canvas, { parameterProfile: {} })
 player.parameterProfile = { angleX: { input: [-20, 20], output: [-30, 30], curve: 1, smoothing: .2 } }
@@ -72,7 +73,7 @@ const bodyTranslations: string[] = bodyPlayer.expressions.map((e) => e.labels.en
 void [playerLabels, playerTranslations, bodyLabels, bodyTranslations]
 // @ts-expect-error unknown expression fields stay rejected, not widened to any
 void player.expressions.map((e) => e.nope)
-const options: LoadOptions = { signal: new AbortController().signal, poster: '/cover.webp', onProgress: (p: LoadProgress) => void (p.step === 'download' ? p.progress : 0) }
+const options: LoadOptions = { signal: new AbortController().signal, poster: '/cover.webp', continueMotion: true, onProgress: (p: LoadProgress) => void (p.step === 'download' ? p.progress : 0) }
 const again: Promise<ModelInfo> = player.load('/avatars/sena.livliv', options)
 const point: [number, number] = player.canvasToModel(1, 2)
 const moved: number = player.poke(point[0], point[1])
@@ -81,7 +82,41 @@ const move: ActionId = 'nod'
 player.act(move)
 player.setAway(true)
 player.maxPixelRatio = 1
+// the blink hand-over: a switch on Player; VRM and PNGTuber characters blink their own way
+player.blinkHandover = false
+const handover: boolean = player.blinkHandover
+void handover
+// @ts-expect-error not on BodyPlayer
+bodyPlayer.blinkHandover = false
 void [moved, code, new FromBody('http', 'x', { status: 404 }).status]
+const own: string | undefined = packageModelJson(['a/model.json', 'model.json'])
+const portable: Promise<Map<string, Blob>> = modelFiles('/characters/k01/')
+void [own, portable]
+// the feel settings: read as they play, changed live; a host of your own may carry them or not
+const feel: Readonly<Tuning> = player.tuning
+const blinkRate: number = bodyPlayer.tuning.blink
+player.setTuning({ turn: 1.2, hairFront: undefined, fringe: null })
+bodyPlayer.setTuning({ mouth: 0.8 })
+const host: Host = { use: () => () => {}, blink() {} }
+const tuned: Host = { ...host, tuning: player.tuning }
+player.use({ update(_f, h) { void h.tuning?.mouth } })
+void [feel, blinkRate, tuned]
+// @ts-expect-error a copy to read: change them with setTuning
+player.tuning.turn = 2
+// @ts-expect-error only the feel settings
+player.setTuning({ turns: 2 })
+// @ts-expect-error a setting is a number
+player.setTuning({ blink: 'fast' })
+// the advanced entry: the renderer, its inspection methods typed read-only
+declare const puppet: Puppet
+const views: readonly MeshView[] = puppet.meshes()
+const hit: LayerHit | undefined = puppet.layersAt(1, 2, { solid: 3 }).layers[0]
+const rgba: [number, number, number, number] | null = puppet.rgbaAt('face', 1, 2)
+puppet.prewarm = true; puppet.retune()
+const fit: RuntimeFit = 'whole'
+void [views, hit, rgba, fit, LIMITS.layers, V, keyformsFit, readModel, new LivelyIdle(), IDLE_STYLE, FaceTracker, VoiceMeter, SpeechPlayer, TalkMotion, ActionPlayer, brand.drawWatermark]
+// @ts-expect-error a mesh is a view: not written to
+views[0].out[0] = 1
 // the types are real, not any: these must be errors
 // @ts-expect-error a switch now: setAway
 player.act('away')

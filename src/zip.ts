@@ -19,6 +19,11 @@ export async function isZip(b: Blob): Promise<boolean> {
   return h.length === 4 && h[0] === 0x50 && h[1] === 0x4b && ((h[2] === 3 && h[3] === 4) || (h[2] === 5 && h[3] === 6))
 }
 
+/** A path that would leave its package: absolute, on a drive, or with a `.` or `..` segment (`/` as the separator). Unzip
+ *  refuses a package holding one, and so does modelFiles(), which also refuses names a file cannot safely have when a
+ *  tool writes it out (control characters, `:`) */
+export const leavesPackage = (path: string) => path.startsWith('/') || /^[A-Za-z]:/.test(path) || path.split('/').some((s) => s === '..' || s === '.')
+
 /** the package's files by path (no folders, no __MACOSX / ._ / .DS_Store litter). Throws on what it cannot or must
  *  not read; a deflated keyforms.json the browser cannot inflate is left out (the character plays on the rig alone) */
 export async function unzip(zip: Blob, signal?: AbortSignal): Promise<Map<string, Blob>> {
@@ -47,7 +52,7 @@ export async function unzip(zip: Blob, signal?: AbortSignal): Promise<Map<string
     const name = raw.replace(/\\/g, '/')
     const base = name.slice(name.lastIndexOf('/') + 1)
     if (name.endsWith('/') || name.startsWith('__MACOSX/') || base.startsWith('._') || base === '.DS_Store' || base === 'Thumbs.db') continue
-    if (name.startsWith('/') || /^[A-Za-z]:/.test(name) || name.split('/').some((s) => s === '..' || s === '.')) {
+    if (leavesPackage(name)) {
       throw fail(`the package holds a path outside itself: ${raw}`)
     }
     if (flags & 1) throw fail(`${name} is encrypted`)

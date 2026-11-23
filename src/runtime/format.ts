@@ -155,7 +155,7 @@ function check(m: ModelDef) {
     nums(line.x, n, n, 'a brow line'); nums(line.bottom ?? [], n, n, 'a brow line'); nums(line.lid ?? [], n, n, 'a brow line')
     if (line.cap != null) nums(line.cap, n, n, 'a brow line')
   }
-  fields(m.tuning, 'turn nod hair blink expr mouth breath hairFront hairBack fringe', 'tuning')
+  fields(m.tuning, 'turn nod hair blink expr mouth breath hairFront hairBack hairSway hairRest fringe', 'tuning')
   const R = m.rig
   fields(R, 'yaw pitch roll bulge bulge_shape hair_limit wind breath sway brow pitch_ease jaw', 'rig')
   nums(R?.bulge_extent, 3, 5, 'rig.bulge_extent'); nums(R?.drift, 2, 2, 'rig.drift'); nums(R?.hair_drive, 3, 3, 'rig.hair_drive')
@@ -218,7 +218,7 @@ interface V4Layer extends Omit<LayerDef, 'name' | 'depth'> { depth?: number; lab
 interface V4 {
   format: string; version: number; name: string; meta: ModelMeta; requires?: string[]; files?: ModelFiles
   canvas: [number, number]; profile?: { id: string; facing?: string; glasses?: boolean }
-  rig?: ModelDef['rig']; tuning?: Partial<Tuning> & { hair_front?: number; hair_back?: number }
+  rig?: ModelDef['rig']; tuning?: Partial<Tuning> & { hair_front?: number; hair_back?: number; hair_sway?: number; hair_rest?: number }
   anchors: ModelDef['anchors']; expressions?: { id: string; label: Labels; hotkey?: string }[]; layers: V4Layer[]
 }
 
@@ -239,8 +239,9 @@ function lower(m: V4, lang: string): ModelDef {
     ({ ...L, depth: L.depth ?? 0, name: label ? pickLabel(label, 'en', L.id) : L.id, ...(expression ? { param: expression } : {}) }) as LayerDef)
   let tuning: Partial<Tuning> | undefined
   if (m.tuning) {
-    const { hair_front, hair_back, ...t } = m.tuning
-    tuning = { ...t, ...(hair_front !== undefined ? { hairFront: hair_front } : {}), ...(hair_back !== undefined ? { hairBack: hair_back } : {}) }
+    const { hair_front, hair_back, hair_sway, hair_rest, ...t } = m.tuning
+    tuning = { ...t, ...(hair_front !== undefined ? { hairFront: hair_front } : {}), ...(hair_back !== undefined ? { hairBack: hair_back } : {}),
+      ...(hair_sway !== undefined ? { hairSway: hair_sway } : {}), ...(hair_rest !== undefined ? { hairRest: hair_rest } : {}) }
   }
   const p = m.profile
   const mark = m.meta?.watermark

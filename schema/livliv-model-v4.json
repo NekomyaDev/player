@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://livliv.ai/schema/livliv-model-v4.json",
-  "$comment": "Format 4.1 (FORMAT.md). The $id is where it will be published. This schema covers model.json; the rules it cannot express (unique ids, references that resolve, files present, image sizes) are FORMAT.md §8.",
+  "$comment": "Format 4.2 (FORMAT.md). The $id is where it will be published. This schema covers model.json; the rules it cannot express (unique ids, references that resolve, files present, image sizes) are FORMAT.md §8.",
   "title": "LivLiv model package, format 4: model.json",
   "type": "object",
   "required": ["format", "version", "name", "meta", "canvas", "anchors", "layers"],
-  "if": { "properties": { "anchors": { "required": ["body"] } }, "required": ["anchors"] },
-  "then": { "required": ["requires"], "properties": { "requires": { "contains": { "const": "full_body" } } } },
+  "if": { "properties": { "anchors": { "type": "object", "required": ["body"] } }, "required": ["anchors"] },
+  "then": { "required": ["requires"], "properties": { "requires": { "type": "array", "contains": { "const": "full_body" } } } },
   "properties": {
     "format": { "const": "livliv-model", "description": "The format. Packages before format 4 say livemaker-puppet (FORMAT-v3.md)." },
     "version": { "const": 4, "description": "The major version. It changes only when a field changes meaning, is removed, or the structure changes (FORMAT.md §9)." },
@@ -167,10 +167,14 @@
         "hair": { "type": "number", "minimum": 0, "maximum": 10 },
         "hair_front": { "type": "number", "minimum": 0, "maximum": 10 },
         "hair_back": { "type": "number", "minimum": 0, "maximum": 10 },
+        "hair_sway": { "type": "number", "minimum": 0, "maximum": 10, "description": "4.2: how far long hair swings sideways below the shoulders, times hair_back (or hair); 0 off." },
+        "hair_rest": { "type": "number", "minimum": 0, "maximum": 10, "description": "4.2: the share of the head's motion that long hair lying on the body below the neck gives up to the body's, 0-1 (more counts as 1); 0 off, missing 1." },
         "blink": { "type": "number", "minimum": 0, "maximum": 10 },
         "expr": { "type": "number", "minimum": 0, "maximum": 10 },
         "mouth": { "type": "number", "minimum": 0, "maximum": 10 },
-        "breath": { "type": "number", "minimum": 0, "maximum": 10 }
+        "breath": { "type": "number", "minimum": 0, "maximum": 10 },
+        "gaze": { "type": "number", "minimum": 0, "maximum": 10, "description": "4.2: the share of the iris's travel the eyes use; 1 and above is all of it." },
+        "fringe": { "type": "number", "minimum": 0, "maximum": 10, "description": "4.2: how far the bangs stand off the face, their depth times this; 0 lies on the face. Readers draw it at most about twice the usual distance (FORMAT.md §5)." }
       },
       "patternProperties": { "^x-": {} },
       "additionalProperties": false

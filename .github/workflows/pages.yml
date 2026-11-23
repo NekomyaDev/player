@@ -30,6 +30,12 @@ jobs:
         run: |
           mkdir _site
           cp -r dist example characters media _site/
+          # characters no longer featured stay here, for pages that load them (not in index.json or the READMEs): Mochi
+          # and Kotaro (q02, q03), their folders and packages from the last commit that had them, byte for byte as before
+          git fetch --depth=1 origin e3f6b640a338a22f8ac7e829821267a9a48b4a12
+          mkdir -p retired && git archive FETCH_HEAD characters/q02 characters/q03 | tar -x -C retired
+          node scripts/pack-characters.mjs retired/characters
+          cp -r retired/characters/q02 retired/characters/q03 retired/characters/q02.livliv retired/characters/q03.livliv _site/characters/
           cp example/pages-index.html _site/index.html
           touch _site/.nojekyll
           # the face model's files, served with the pages: the camera demo then needs neither jsDelivr nor Google's bucket

@@ -6,7 +6,7 @@
   "generator": {
    "name": "livliv.ai"
   },
-  "created": "2026-11-06T07:26:36Z",
+  "created": "2026-11-23T06:03:46Z",
   "license": {
    "id": "LicenseRef-LivLiv-Samples",
    "url": "https://livliv.ai/licenses/samples",
@@ -312,20 +312,20 @@
   {
    "id": "eye_L_skin",
    "texture": "textures/eye_L_skin.webp",
-   "x": 388,
-   "y": 367,
-   "w": 99,
-   "h": 80,
+   "x": 389,
+   "y": 368,
+   "w": 91,
+   "h": 74,
    "group": "head",
    "depth": 0
   },
   {
    "id": "eye_L_closed",
    "texture": "textures/eye_L_closed.webp",
-   "x": 374,
-   "y": 336,
-   "w": 125,
-   "h": 126,
+   "x": 378,
+   "y": 358,
+   "w": 107,
+   "h": 99,
    "group": "head",
    "depth": 0,
    "role": "lid_L"
@@ -334,10 +334,10 @@
    "id": "eye_L",
    "texture": "textures/eye_L.webp",
    "mask": "textures/eye_L_mask.webp",
-   "x": 374,
+   "x": 378,
    "y": 362,
-   "w": 125,
-   "h": 100,
+   "w": 107,
+   "h": 95,
    "group": "head",
    "depth": 0,
    "role": "eye_L",
@@ -369,20 +369,20 @@
   {
    "id": "eye_R_skin",
    "texture": "textures/eye_R_skin.webp",
-   "x": 538,
-   "y": 357,
-   "w": 100,
-   "h": 86,
+   "x": 546,
+   "y": 359,
+   "w": 92,
+   "h": 79,
    "group": "head",
    "depth": 0
   },
   {
    "id": "eye_R_closed",
    "texture": "textures/eye_R_closed.webp",
-   "x": 509,
-   "y": 330,
-   "w": 144,
-   "h": 125,
+   "x": 527,
+   "y": 348,
+   "w": 122,
+   "h": 95,
    "group": "head",
    "depth": 0,
    "role": "lid_R"
@@ -391,10 +391,10 @@
    "id": "eye_R",
    "texture": "textures/eye_R.webp",
    "mask": "textures/eye_R_mask.webp",
-   "x": 509,
-   "y": 330,
-   "w": 138,
-   "h": 125,
+   "x": 529,
+   "y": 347,
+   "w": 117,
+   "h": 96,
    "group": "head",
    "depth": 0,
    "role": "eye_R",
@@ -481,21 +481,6 @@
    "brows": "redrawn"
   },
   {
-   "id": "expr_sad",
-   "texture": "textures/expr_sad.webp",
-   "talk": "textures/expr_sad_talk.webp",
-   "brow_tex": "textures/expr_sad_newbrows.webp",
-   "x": 373,
-   "y": 291,
-   "w": 281,
-   "h": 263,
-   "group": "head",
-   "depth": 0,
-   "role": "expr",
-   "expression": "sad",
-   "brows": "redrawn"
-  },
-  {
    "id": "expr_angry",
    "texture": "textures/expr_angry.webp",
    "talk": "textures/expr_angry_talk.webp",
@@ -508,6 +493,21 @@
    "depth": 0,
    "role": "expr",
    "expression": "angry",
+   "brows": "redrawn"
+  },
+  {
+   "id": "expr_sad",
+   "texture": "textures/expr_sad.webp",
+   "talk": "textures/expr_sad_talk.webp",
+   "brow_tex": "textures/expr_sad_newbrows.webp",
+   "x": 373,
+   "y": 291,
+   "w": 281,
+   "h": 263,
+   "group": "head",
+   "depth": 0,
+   "role": "expr",
+   "expression": "sad",
    "brows": "redrawn"
   },
   {
@@ -542,18 +542,6 @@
    "depth": 0
   },
   {
-   "id": "expr_angry_brows",
-   "texture": "textures/expr_angry_brows.webp",
-   "x": 403,
-   "y": 313,
-   "w": 227,
-   "h": 47,
-   "group": "head",
-   "depth": 0,
-   "role": "expr_brows",
-   "expression": "angry"
-  },
-  {
    "id": "expr_sad_brows",
    "texture": "textures/expr_sad_brows.webp",
    "x": 403,
@@ -564,6 +552,18 @@
    "depth": 0,
    "role": "expr_brows",
    "expression": "sad"
+  },
+  {
+   "id": "expr_angry_brows",
+   "texture": "textures/expr_angry_brows.webp",
+   "x": 403,
+   "y": 313,
+   "w": 227,
+   "h": 47,
+   "group": "head",
+   "depth": 0,
+   "role": "expr_brows",
+   "expression": "angry"
   },
   {
    "id": "expr_shy_brows",

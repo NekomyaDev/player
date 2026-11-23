@@ -21,9 +21,9 @@ import { LIMITS, coded, latticeOf, readModel, type Labels, type ModelFiles, type
 import { CROUCH_CAM, FB_ANKLE, FB_ANKLE_BAND, FB_CAM_SWAY, FB_GAIN, FB_HEM_C, FB_HEM_K, FB_HEM_LAG, FB_HEM_MAX, FB_HEM_WIND,
   FB_HIP_BACK, FB_HIP_C, FB_HIP_IDLE, FB_HIP_K, FB_HIP_REACH, FB_HIP_SLIDE, FB_HIP_TILT, FB_SHOULDER_ANSWER, FB_WAIST,
   fitBox, fullBody, type BodyAnchors, type Fit, type FullBody } from './fullbody'
-import { PARAM_RANGES, defaultParams, smooth, type Params } from './params'
+import { BLINK_HOLD, PARAM_RANGES, blinkOpen, blinkOver, defaultParams, eyeFade, smooth, type Params } from './params'
 
-export { PARAM_RANGES, defaultParams, smooth, type Params }
+export { BLINK_HOLD, PARAM_RANGES, blinkOpen, blinkOver, defaultParams, eyeFade, smooth, type Params }
 
 export interface LayerDef {
   id: string; name: string; texture: string
@@ -205,15 +205,32 @@ export const defaultRig = (): Rig => ({
 /** user-facing "feel" settings (livliv.ai's feel sliders); 1 = default. nod scales up / down on top of turn. hair is how
  *  freely the hair swings; hairFront (the bangs' springs) and hairBack (long hair's, and the swinging pieces': chains)
  *  each take its place when set, so a model saved with hair alone moves both as before.
+ *  blink, expr, mouth: how often the idle motion blinks, how readily face tracking reads a smile, how far face tracking
+ *  and live lip sync open the mouth (the player reads these, not the renderer).
  *  gaze: the share of the iris's travel it uses, 0-1. Less shows less of what a far look uncovers in the whites and fixes
  *  none of it; above 1 only shows more, so it stops at 1.
  *  fringe: how far the bangs stand off the face, their depth times this (fringeScale): 0 lies on the face, more only up
  *  to FRINGE_MAX */
-export type Tuning = { turn: number; nod: number; hair: number; blink: number; expr: number; mouth: number; breath: number; hairFront?: number; hairBack?: number; gaze: number; fringe?: number }
+export type Tuning = { turn: number; nod: number; hair: number; blink: number; expr: number; mouth: number; breath: number; hairFront?: number; hairBack?: number; gaze: number; fringe?: number
+  /** the long hair's swing below the shoulders (SWAY), times hairBack: 0 is off (as before 0.6.0), 1 the default */
+  hairSway?: number
+  /** long hair resting on the body (hairRestOf): the share of the head's motion that hair lying on the body below the neck
+   *  gives up to the body's. 0 is as before 0.6.0; unset, the default */
+  hairRest?: number }
 export const defaultTuning = (): Tuning => ({ turn: 1, nod: 1, hair: 1, blink: 1, expr: 1, mouth: 1, breath: 1, gaze: 1 })
 /** the deepest the bangs go when tuning.fringe pulls them out: the usual 0.15 bangs reach 2x; at 0.45 (3x) strands
  *  crossed the eyes on a turn. A layer drawn deeper keeps its own depth */
 export const FRINGE_MAX = 0.3
+/** Long hair lying on the shoulders and chest goes with the body, not the head. Moved with the head alone, on a large move of
+ *  the head and the torso together it slid tens of pixels over the clothes, and what it had covered showed between the strands
+ *  (light clothes in fragments through dark hair, a hard edge along a collar). Where the hair lies over the body (its coverage
+ *  field, as the long hair's swing reads it) it takes this share of the head's motion less, from the neck down; beside the body
+ *  and above the neck nothing changes. A model without tuning.hairRest gets the default; a still frame is the same either way */
+export const HAIR_REST_DEFAULT = 1
+export function hairRestOf(t: Partial<Tuning> | undefined): number {
+  const v = t?.hairRest
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.min(v, 1) : HAIR_REST_DEFAULT
+}
 /** what tuning.fringe at `k` does to a layer of depth `d`: a factor on its depth, 1 at k = 1 exactly (nothing else read), so a
  *  character nobody moved it on draws as before bit for bit. Per layer, not per vertex: the fall-off at the skull's edge stays */
 export function fringeScale(d: number, k: number | undefined): number {
@@ -237,6 +254,11 @@ interface GLLayer {
    *  it once: re-uploading a buffer a draw still uses waited on that draw, 94 ms a frame drawing one puppet thrice) */
   uploaded?: boolean
   wHead: Float32Array; wPhys1: Float32Array; wPhys2: Float32Array; dep: Float32Array; wFront: Float32Array
+  /** how much of the long hair's swing (Puppet.sway) the vertex takes: 0 at the shoulders, 1 at the tips (hair layers only) */
+  wSway: Float32Array
+  /** how much the vertex rests on the body (hair layers only): the body's coverage there, from the neck down, 0 in the bangs;
+   *  the head's weight is wHead x (1 - hairRest x wHold) */
+  wHold?: Float32Array
   wBrow: Float32Array; browSide: Int8Array; wJaw: Float32Array
   /** the most the brow field moves each vertex (model px; Infinity: no cap), from brow_lines' cap */
   browCap: Float32Array
@@ -346,13 +368,148 @@ function browLimits(A: ModelDef['anchors'], amp: number): [number, number] {
 }
 
 /** what a caller may give a load: see Puppet.load */
-interface LoadExtras { signal?: AbortSignal; onImage?: (came: number, of: number) => void }
+interface LoadExtras {
+  signal?: AbortSignal; onImage?: (came: number, of: number) => void
+  /** the new model takes the motion over where the one before is (carryMotion): the same character, edited and loaded again */
+  keepMotion?: boolean
+}
 
 /** a layer's images, as they came in */
 interface LayerImages { main: HTMLImageElement; frames: HTMLImageElement[]; mask?: HTMLImageElement; talk?: HTMLImageElement; brows?: HTMLImageElement }
 
 interface Spring { x: number; y: number; vx: number; vy: number }
 const spring = (): Spring => ({ x: 0, y: 0, vx: 0, vy: 0 })
+/** The long hair's swing below the shoulders. Below the jaw, long hair follows the torso and its springs take only the head's speed,
+ *  so its tips moved less than the hair at the shoulders. A pendulum hung between the hair's root and the neck, thrown by that point's
+ *  acceleration (head and torso), swings the hair sideways from `top` head half-heights below the neck, rising to the hair's own
+ *  bottom by the power `curve`; `freq` Hz and damping ratio `damp` (it settles by itself); `drive` how hard it is thrown at tuning 1;
+ *  `limit` how far it may swing, in face widths at the tips (times the strength above 1). Over the body (its alpha blurred `bodyBlur`
+ *  face widths) it is taken down by `body`, so a lock between an arm and the torso does not slide behind the arm in pieces. Only hair
+ *  that hangs from the head swings: hair-layer pixels apart from it by more than 2 x `bridge` face widths (a scrap of a cape left in a
+ *  hair layer) keep to the body as before. Strength = tuning.hairBack (or hair) x tuning.hairSway; at 0 every frame is as before */
+export const SWAY = { top: 0.5, curve: 1.3, freq: 1.1, damp: 0.2, drive: 1.0, limit: 0.35, body: 0.75, bodyBlur: 0.25, bridge: 0.12 }
+export interface SwayState { x: number; vx: number; px: number; pvx: number; ax: number; started: boolean }
+export const swayState = (): SwayState => ({ x: 0, vx: 0, px: 0, pvx: 0, ax: 0, started: false })
+/** a coverage map of the canvas: cells `g` model px wide, `w` x `h` of them, values 0-1 */
+export interface Field { g: number; w: number; h: number; a: Float32Array }
+/** lattice cells (the meshes' one lattice) of the hair that hangs from the head: `w` x `h` from lattice cell (`ox`, `oy`), 1 = hangs */
+export interface Hang { ox: number; oy: number; w: number; h: number; r: Uint8Array }
+
+/** one step of the swing: the pivot's x this step (model px), the strength (0 holds it still at 0), the face width (its limit). The
+ *  pivot's acceleration is low-passed (~40 ms) so a tracked face's jitter does not shake it */
+export function stepSway(sw: SwayState, px: number, dt: number, strength: number, fw: number) {
+  // a number that is none (a NaN from anywhere) would stay in the pendulum for good: such a step is skipped, and a state
+  // gone bad starts again at rest
+  if (!Number.isFinite(px) || !Number.isFinite(dt) || !Number.isFinite(strength) || !Number.isFinite(fw)) return
+  if (![sw.x, sw.vx, sw.px, sw.pvx, sw.ax].every(Number.isFinite)) Object.assign(sw, swayState())
+  const inv = 1 / Math.max(dt, 1e-4), ks = Math.min(1, dt * 25)
+  if (!sw.started) Object.assign(sw, { px, pvx: 0, ax: 0, started: true })
+  const vx = sw.pvx + ((px - sw.px) * inv - sw.pvx) * ks
+  sw.ax += ((vx - sw.pvx) * inv - sw.ax) * ks
+  sw.px = px; sw.pvx = vx
+  if (strength === 0 && Math.abs(sw.x) < 1e-3 && Math.abs(sw.vx) < 1e-2) { sw.x = 0; sw.vx = 0; return }  // strength 0: as before, exactly
+  const w = 2 * Math.PI * SWAY.freq, a = -w * w * sw.x - 2 * SWAY.damp * w * sw.vx - SWAY.drive * strength * sw.ax
+  sw.vx += a * dt; sw.x += sw.vx * dt
+  const lim = SWAY.limit * fw * Math.max(1, strength)
+  if (Math.abs(sw.x) > lim) { sw.x = Math.sign(sw.x) * lim; sw.vx = 0 }
+}
+
+/** how much of the swing a hair vertex at height `y` takes: none at `top` and above, rising to all of it `len` below; none in the
+ *  bangs (`f`); less over the body (`cover`, 0-1). One function of position for every hair layer, so no seam can open */
+export function swayWeight(y: number, top: number, len: number, f: number, cover: number) {
+  return (1 - f) * Math.pow(smooth(0, 1, (y - top) / Math.max(1, len)), SWAY.curve) * (1 - SWAY.body * cover)
+}
+
+/** which of the hair layers' lattice cells (`cells`, 1 = some hair layer draws there; `w` x `h`) hang from the head: flood-filled
+ *  from those in the first `seed` rows (above the neck), across gaps of up to 2 x `bridge` cells (a hair tie, a ribbon the cut took
+ *  out of a twin tail). What stays apart is a scrap of the clothes or the body that the cut left in a hair layer */
+export function hangingCells(cells: Uint8Array, w: number, h: number, seed: number, bridge: number) {
+  const out = new Uint8Array(w * h), stack: number[] = []
+  // the gaps bridged: each row widened, then each column, by a running count over the window (as long whatever the
+  // bridge: an untrusted model's face width sets it)
+  const b = Math.max(0, Math.floor(bridge)), a = widen(cells, w, h, b, 1, w), d = widen(a, h, w, b, w, 1)
+  for (let i = 0; i < Math.min(h, Math.max(0, seed)) * w; i++) if (cells[i]) { out[i] = 1; stack.push(i) }
+  while (stack.length) {
+    const i = stack.pop()!, x = i % w, y = (i - x) / w
+    for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) {
+      if (j >= 0 && d[j] && !out[j]) { out[j] = 1; stack.push(j) }
+    }
+  }
+  return out
+}
+
+/** each cell set where a cell within `b` of it along a line is: `n` lines of `len` cells, `step` apart along a line and
+ *  `across` apart between lines (rows: 1 and w; columns: w and 1). One pass per line, a running count over the window */
+function widen(src: Uint8Array, len: number, n: number, b: number, step: number, across: number) {
+  const out = new Uint8Array(src.length)
+  for (let l = 0; l < n; l++) {
+    const o = l * across
+    let count = 0
+    for (let k = 0; k <= Math.min(len - 1, b); k++) count += src[o + k * step]
+    for (let k = 0; k < len; k++) {
+      if (count) out[o + k * step] = 1
+      const add = k + b + 1, drop = k - b
+      if (add < len) count += src[o + add * step]
+      if (drop >= 0) count -= src[o + drop * step]
+    }
+  }
+  return out
+}
+
+/** whether the lattice point (gx, gy) borders a cell of the hair that hangs from the head; all of it does without a map */
+export function hangsAt(H: Hang | undefined, gx: number, gy: number) {
+  if (!H) return true
+  for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) {
+    const x = gx + dx - H.ox, y = gy + dy - H.oy
+    if (x >= 0 && y >= 0 && x < H.w && y < H.h && H.r[y * H.w + x]) return true
+  }
+  return false
+}
+
+/** a box blur of radius r cells, rows then columns, twice (close to a Gaussian); values stay within those given */
+export function blurField(a: Float32Array, w: number, h: number, r: number) {
+  let cur = Float32Array.from(a)
+  for (let pass = 0; pass < 2; pass++) {
+    const b = new Float32Array(cur.length), c = new Float32Array(cur.length)
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let s = 0, n = 0
+      for (let k = Math.max(0, x - r); k <= Math.min(w - 1, x + r); k++) { s += cur[y * w + k]; n++ }
+      b[y * w + x] = s / n
+    }
+    for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) {
+      let s = 0, n = 0
+      for (let k = Math.max(0, y - r); k <= Math.min(h - 1, y + r); k++) { s += b[k * w + x]; n++ }
+      c[y * w + x] = s / n
+    }
+    cur = c
+  }
+  return cur
+}
+
+/** the field at model point (x, y), bilinear; 0 without one */
+export function fieldAt(F: Field | undefined, x: number, y: number) {
+  if (!F) return 0
+  const fx = Math.min(F.w - 1, Math.max(0, x / F.g - 0.5)), fy = Math.min(F.h - 1, Math.max(0, y / F.g - 0.5))
+  const x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(F.w - 1, x0 + 1), y1 = Math.min(F.h - 1, y0 + 1), u = fx - x0, v = fy - y0
+  const at = (xx: number, yy: number) => F.a[yy * F.w + xx]
+  return (at(x0, y0) * (1 - u) + at(x1, y0) * u) * (1 - v) + (at(x0, y1) * (1 - u) + at(x1, y1) * u) * v
+}
+
+/** the body's coverage, coarse (a cell a sixteenth of the face wide) and blurred SWAY.bodyBlur face widths: from its texture's
+ *  alpha, or with `alpha` undefined (a texture the page may not read) from its box */
+export function coverField(L: { x: number; y: number; w: number; h: number }, canvas: [number, number], fw: number,
+  alpha?: (w: number, h: number, g: number) => Float32Array): Field {
+  const g = Math.max(4, fw / 16), w = Math.ceil(canvas[0] / g), h = Math.ceil(canvas[1] / g)
+  let a: Float32Array
+  if (alpha) a = alpha(w, h, g)
+  else {
+    a = new Float32Array(w * h)
+    for (let y = Math.max(0, Math.floor(L.y / g)); y < Math.min(h, Math.ceil((L.y + L.h) / g)); y++) {
+      for (let x = Math.max(0, Math.floor(L.x / g)); x < Math.min(w, Math.ceil((L.x + L.w) / g)); x++) a[y * w + x] = 1
+    }
+  }
+  return { g, w, h, a: blurField(a, w, h, Math.max(1, Math.round((SWAY.bodyBlur * fw) / g))) }
+}
 type Group = 'front' | 'back' | 'side'
 /** where hair at head height takes the side chain instead of the bangs' (rig.hair.side): from 0 to 1 between
  *  these distances from the head's centre line, in skull half-widths. One function of position, like place()'s f, so
@@ -381,6 +538,13 @@ export class Puppet {
   lastHead = { x: 0, y: 0, roll: 0 }
   /** rig.hair_drive's pivot: the face's centre on the head, its smoothed velocity and acceleration (model px, s) */
   drive = { x: 0, y: 0, vx: 0, vy: 0, ax: 0, ay: 0, started: false }
+  /** the long hair's swing (SWAY): x is model px at the hair's tips; the layers take it by wSway */
+  sway: SwayState = swayState()
+  /** where the long hair ends (the swing's reach), and the body's coverage (less swing over it), set when a model is built */
+  swayBottom = 0
+  bodyCover?: Field
+  /** ... and which hair hangs from the head (the rest keeps to the body) */
+  hairHang?: Hang
   /** smoothed torso pose (degrees): the body lags the head */
   body = { yaw: 0, roll: 0 }
   /** chest spring: position / velocity, relative to the chest anchor's rigid motion */
@@ -479,6 +643,10 @@ export class Puppet {
   /** keyforms.json's interp 'hermite': per key, the key on the other side of 0 of the same angle (-1: none) */
   private kfPair: number[] | null = null
   kfOff = false
+  /** the keyforms the keys were measured from, kept to measure them again when turn, nod, fringe or hairRest changes
+   *  (retune), and their fields decoded */
+  private kfFile: KeyformFile | undefined = undefined
+  private kfBytes: Map<string, Uint8Array> | undefined = undefined
   /** each key's weight (Puppet.keys order) set by the caller instead of taken from the angle: a player switching
    *  between puppets of drawn views morphs each toward the other's layout over a fixed time */
   keyWeights: number[] | null = null
@@ -502,12 +670,19 @@ export class Puppet {
    *  stencil at mask alpha 0.5 everywhere, stepped along the cut (for comparisons). At rest it is the
    *  stencil either way, so the rest pose stays as built */
   softIris = true
+  /** draw everything a model may draw once on its first frame, out of sight (warm): off by default here, on in Player */
+  prewarm = false
+  /** the model's textures and ways of drawing have not been used yet: the next render draws them once first (warm) */
+  private cold = false
   /** a look toward the nose stops the iris's inner edge at the drawn inner corner, where the whites end: past it
    *  the whites' straight end cut the iris. Its far edge travels on, so the iris narrows as an eyeball
    *  turning does, to irisNasalNarrow of its width at most, and then stops whole (1: stops whole at the corner, the eyes
    *  diverge). Outward, up and down as before; false: the build's travel both ways (for comparisons) */
   irisNasal = true
   irisNasalNarrow = 0.7
+  /** the blink hand-over (eyeFade): the open eye stays whole until it is a thin slit, so no see-through iris shows
+   *  mid-blink. A player holds each blink shut for BLINK_HOLD with it on. false: the blink as before */
+  blinkHandover = true
   /** per eye side (L / R): its iris's room toward the nose, measured at load */
   private nasal: Partial<Record<string, Nasal>> = {}
   /** the model's swinging pieces (rig.chains), simulated in update() */
@@ -554,7 +729,7 @@ export class Puppet {
    *  exported package has none: the SDK turns it off rather than ask for it and get a 404). signal: calls the load off
    *  until the model starts going in, which then happens at once and whole; it rejects with the signal's reason and the
    *  model before stays. onImage: each image that has come in, of how many */
-  async load(baseUrl: string, { png = false, pack: usePack = true, signal, onImage }: { png?: boolean; pack?: boolean } & LoadExtras = {}) {
+  async load(baseUrl: string, { png = false, pack: usePack = true, signal, onImage, keepMotion }: { png?: boolean; pack?: boolean } & LoadExtras = {}) {
     const { file, base, query } = locate(baseUrl)
     const r = await fetch(file + (query ? `?${query}` : ''), { cache: 'no-store', signal })
     if (!r.ok) throw Object.assign(new Error(r.status === 404 ? 'model not found' : `model.json ${r.status}`), { status: r.status })
@@ -583,12 +758,12 @@ export class Puppet {
     const pack = png || !usePack ? null : await loadPack(packUrl(baseUrl, tag), signal)
     // (an <img> cannot be called off: setting src to '' is an error, removing it never ends)
     const fetched = (f: string) => (signal ? fetchImage(base + f + v, signal) : loadImage(base + f + v))
-    await this.loadModel(model, (f) => { const b = pack?.get(f); return b ? loadBlob(b) : fetched(f) }, { png, keyforms, signal, onImage })
+    await this.loadModel(model, (f) => { const b = pack?.get(f); return b ? loadBlob(b) : fetched(f) }, { png, keyforms, signal, onImage, keepMotion })
   }
 
   /** a model from anywhere (the SDK: files the user picked): its model.json, and each image it names by its path there */
   async loadModel(raw: ModelDef, image: (path: string) => Promise<HTMLImageElement>,
-    { png = false, keyforms: keyformsComing, signal, onImage }: { png?: boolean; keyforms?: KeyformFile | Promise<KeyformFile | undefined> } & LoadExtras = {}) {
+    { png = false, keyforms: keyformsComing, signal, onImage, keepMotion = false }: { png?: boolean; keyforms?: KeyformFile | Promise<KeyformFile | undefined> } & LoadExtras = {}) {
     const model = readModel(raw)
     let asked = 0, came = 0
     const arrived = (i: HTMLImageElement) => { onImage?.(++came, asked); return i }
@@ -610,16 +785,16 @@ export class Puppet {
         throw coded('too-large', `this model's images are too large (${w} x ${h}: ${most} px a side and ${LIMITS.texels} pixels in all at most)`)
       }
     }
-    this.install(model, imgs, keyforms)
+    this.install(model, imgs, keyforms, keepMotion)
   }
 
   /** the model in place of the one before, or, if anything throws on the way (its layers, its keyforms, the GPU out of
    *  memory), the one before exactly as it was: its layers on the GPU, every field, every spring. All in one go: no frame
    *  runs in between. The GPU holds both for that moment */
-  private install(model: ModelDef, imgs: LayerImages[], keyforms: KeyformFile | undefined) {
+  private install(model: ModelDef, imgs: LayerImages[], keyforms: KeyformFile | undefined, keepMotion = false) {
     const gl = this.gl
     // every field; copies of the two this changes in place rather than replaces
-    const before = { ...this, drive: { ...this.drive },
+    const before = { ...this, drive: { ...this.drive }, sway: { ...this.sway },
       chains: Object.fromEntries(Object.entries(this.chains).map(([g, c]) => [g, c.map((q) => ({ ...q }))])) as Puppet['chains'] }
     const built: GLLayer[] = []
     for (let i = 0; i < 8 && gl.getError(); i++);  // an error left by anything earlier is not this model's
@@ -633,12 +808,43 @@ export class Puppet {
       Object.assign(this, before)
       throw e
     }
+    if (keepMotion) this.carryMotion(before as unknown as Puppet)
     this.freeLayers(before.layers)
     this.freeMask()
   }
 
+  /** What goes on from the model before (`b`, as it was) to this one, built in its place: the hair groups' springs, each
+   *  swinging chain with the same id and as many joints, the torso's lag behind the head, the face's drive, the long hair's
+   *  swing, a full-body figure's motion, and the expressions as they show. For the same character edited and loaded again:
+   *  its next frame goes on from its last instead of starting at rest. Anything else of it starts as a new model's does */
+  private carryMotion(b: Puppet) {
+    for (const [g, c] of Object.entries(b.chains) as [Group, [Spring, Spring]][]) this.chains[g]?.forEach((q, i) => { if (c[i]) Object.assign(q, c[i]) })
+    const runs = new Map(b.chainRuns.map((C) => [C.def.id, C]))
+    for (const C of this.chainRuns) {
+      const o = runs.get(C.def.id)
+      if (!o || o.p.length !== C.p.length) continue
+      C.p.set(o.p); C.q.set(o.q); C.disp.set(o.disp); C.beta.set(o.beta)
+      C.W = [...o.W]; C.V = [...o.V]; C.acc = [...o.acc]; C.rho = o.rho; C.started = o.started; C.moving = o.moving; C.phase = o.phase
+    }
+    Object.assign(this, { lastHead: { ...b.lastHead }, drive: { ...b.drive }, body: { ...b.body }, bust: { ...b.bust }, fbm: { ...b.fbm }, sway: { ...b.sway },
+      crouch: b.crouch, dip: b.dip, expr: { ...b.expr }, smileShown: b.smileShown })
+    this.pv.roll = NaN
+  }
+
   private build(model: ModelDef, imgs: LayerImages[], keyforms: KeyformFile | undefined, built: GLLayer[]) {
     this.model = model
+    this.cold = true
+    // where the long hair ends (the swing's reach): the lowest hair layer's box, the drawing's bottom at most (one value for every hair
+    // layer, so their weights stay one field). Twin tails that end at the chest swing to their tips, not to the picture's bottom edge
+    const hairBoxes = model.layers.filter((L) => (L.group === 'hair_back' || L.group === 'hair_side' || L.group === 'hair_inner') && !L.rigid)
+    const A0 = model.anchors
+    this.swayBottom = Math.min(A0.body && A0.hair_bottom_y != null ? A0.hair_bottom_y : A0.bottom_y,
+      hairBoxes.length ? Math.max(...hairBoxes.map((L) => L.y + L.h)) : A0.bottom_y)
+    // ... and where the body is (blurred): long hair over the body or between the arms and the torso swings less
+    const bi = model.layers.findIndex((L) => L.id === 'body')
+    this.bodyCover = bi >= 0 && imgs[bi]?.main ? bodyCoverOf(imgs[bi].main, model.layers[bi], model.canvas, A0.face[2] - A0.face[0]) : undefined
+    // ... and which of it hangs from the head: a scrap of a cape left in the hair layers stays put instead of swinging off
+    this.hairHang = hairHangOf(model, imgs, A0.face[2] - A0.face[0])
     this.chainRuns = (model.rig?.chains || []).map(chainRun)
     const mouth = model.layers.find((L) => L.role === 'mouth')
     this.frameKind = (mouth?.frames || ['', '', '']).map((_, i) => mouth?.visemes?.[i] || ['closed', 'half', 'open'][i] || '')
@@ -699,8 +905,8 @@ export class Puppet {
     // all that carries over from frame to frame starts again: nothing of the model before moves this one (and a NaN
     // in the torso's smoothing once stayed there for good, whatever was loaded next)
     this.resetPhysics()
-    this.keys = []; this.kfPair = null
-    if (keyforms && keyformsFit(keyforms)) this.prepareKeyforms(keyforms)
+    this.keys = []; this.kfPair = null; this.kfFile = undefined; this.kfBytes = undefined
+    if (keyforms && keyformsFit(keyforms)) { this.kfFile = keyforms; this.prepareKeyforms(keyforms) }
     else if (keyforms) console.warn('LivLiv: keyforms.json is not one this player reads; the character plays on the rig alone')
   }
 
@@ -710,7 +916,9 @@ export class Puppet {
   private prepareKeyforms(K: KeyformFile) {
     // base64 to bytes, each field once (one field can serve every head layer). A plain loop: Uint8Array.from(text, mapper)
     // calls back per character, which took half of the refined Nana's load
-    const seen = new Map<string, Uint8Array>()
+    // (kept with the keyforms: measuring again for a change of turn, nod, fringe or hairRest, as a slider moves, decodes
+    // nothing again)
+    const seen = this.kfBytes ??= new Map<string, Uint8Array>()
     const bytes = (b64: string) => {
       let out = seen.get(b64)
       if (!out) {
@@ -768,6 +976,7 @@ export class Puppet {
     this.anchorModel = null
     this.freeLayers(this.layers)
     this.freeMask()
+    if (this.pickFb) { this.gl.deleteFramebuffer(this.pickFb); this.pickFb = null }
     this.layers = []
   }
 
@@ -833,7 +1042,8 @@ export class Puppet {
     }
     const n = pos.length / 2
     const rest = new Float32Array(pos)
-    const wHead = new Float32Array(n), wPhys1 = new Float32Array(n), wPhys2 = new Float32Array(n)
+    const wHead = new Float32Array(n), wPhys1 = new Float32Array(n), wPhys2 = new Float32Array(n), wSway = new Float32Array(n)
+    const wHold = this.bodyCover && L.group !== 'head' && L.group !== 'body' ? new Float32Array(n) : undefined
     const dep = new Float32Array(n), wBrow = new Float32Array(n), browSide = new Int8Array(n).fill(-1), wFront = new Float32Array(n)
     const browCap = new Float32Array(n).fill(Infinity)
     const wJaw = new Float32Array(n)
@@ -855,6 +1065,9 @@ export class Puppet {
     const hairTop = A.neck_y - 0.1 * h.ry
     // ... and swings fully at its own tips: on a full-body model the drawing's bottom is the feet, far below them
     const hairLen = Math.max(1, (A.body && A.hair_bottom_y != null ? A.hair_bottom_y : A.bottom_y) - hairTop)
+    // the swing's reach (SWAY): from the shoulders down to the hair's own bottom
+    const swayTop = A.neck_y + SWAY.top * h.ry
+    const swayLen = this.swayBottom - swayTop
     for (let i = 0; i < n; i++) {
       const x = rest[2 * i], y = rest[2 * i + 1]
       const rr = Math.hypot((x - h.cx) / h.rx, (y - h.cy) / h.ry)
@@ -877,6 +1090,10 @@ export class Puppet {
         wPhys1[i] = f * tb + (1 - f) * lp1; wPhys2[i] = f * tb * tb + (1 - f) * lp2
         wFront[i] = f
         if (L.group === 'hair_inner') { wHead[i] *= 0.5; wPhys1[i] *= 0.35; wPhys2[i] *= 0.35 }
+        // resting on the body: one field of position for every hair layer, so the inner hair and the back hair under a strand
+        // give up as much of the head's motion as the strand does; from the neck down, none of it in the bangs (f)
+        if (wHold) wHold[i] = (1 - f) * fieldAt(this.bodyCover, x, y) * smooth(A.neck_y - 0.1 * h.ry, A.neck_y + 0.35 * h.ry, y)
+        wSway[i] = hangsAt(this.hairHang, Math.round(x / cell), Math.round(y / cell)) ? swayWeight(y, swayTop, swayLen, f, fieldAt(this.bodyCover, x, y)) : 0
       }
       if (alt && bangs) {  // the front hair's own weights at this vertex: the same lattice point moves the same way
         const k = 5 * i
@@ -987,7 +1204,7 @@ export class Puppet {
     return {
       def: L, tex, frames: frameTex, mask: maskTex, talk: talkTex, browTex,
       vao, pos: pb, uvs: ub, tris: ib, count: idx.length, rest, out: new Float32Array(rest.length), tri, tw: img.naturalWidth || img.width, th: img.naturalHeight || img.height,
-      wHead, wPhys1, wPhys2, dep, wBrow, browSide, browCap, wFront, wJaw, wNeck, wTwist, fol, folB, alt,
+      wHead, wPhys1, wPhys2, wSway, wHold, dep, wBrow, browSide, browCap, wFront, wJaw, wNeck, wTwist, fol, folB, alt,
       outB: folB ? new Float32Array(rest.length) : undefined, stencilRef: 0, soft: 0, maskCh: -1, skin, altSkin,
     }
   }
@@ -1458,6 +1675,17 @@ export class Puppet {
     return kind === 'half' ? smooth(t1, t2, m) : kind === 'open' ? smooth(t2, 1, m) : smooth(t1, 1, m)
   }
 
+  /** the long hair's swing one step: its pivot halfway between the hair's root on the head and the neck on the torso. Strength =
+   *  tuning.hairBack (or hair) x tuning.hairSway (1 by default): 0 keeps every frame as before */
+  private stepSway(dt: number) {
+    const P = this.params, A = this.model.anchors
+    const s = this.physicsScale * (this.tuning.hairBack ?? this.tuning.hair) * (this.tuning.hairSway ?? 1)
+    const hp: [number, number] = [0, 0], bp: [number, number] = [0, 0]
+    this.headXform(A.head.cx, A.hair_root_y, 0, P, hp)
+    this.bodyOffset(A.head.cx, A.neck_y, P, bp)
+    stepSway(this.sway, 0.5 * hp[0] + 0.5 * (A.head.cx + bp[0]), dt, s, A.face[2] - A.face[0])
+  }
+
   private stepPhysics(dt: number) {
     const P = this.params, A = this.model.anchors
     const ht: [number, number] = [0, 0]
@@ -1503,6 +1731,7 @@ export class Puppet {
         q.x = Math.max(-lim, Math.min(lim, q.x)); q.y = Math.max(-lim * 0.6, Math.min(lim * 0.6, q.y))
       }
     }
+    this.stepSway(dt)
   }
 
   /** one frame: time, physics, the mesh. `mesh` false keeps the physics going without moving the mesh (a puppet not
@@ -1542,6 +1771,7 @@ export class Puppet {
     })
     // where the head, the body and the hair springs take the point (x, y) of a layer with these weights: into pt
     const pt: [number, number] = [0, 0]
+    const swayX = this.kfOff ? 0 : this.sway.x
     const sideOn = !!this.rig.hair.side
     const place = (x: number, y: number, wh: number, dep: number, w1: number, w2: number, f: number) => {
       // a point that moves with the head alone takes nothing of the torso: no need to work it out
@@ -1595,6 +1825,7 @@ export class Puppet {
     }
     // tuning.fringe: the bangs' depth, and the brows over them that move as the bangs do (alt), scaled where read
     const fringeB = fringeScale(this.bangsDepth, this.tuning.fringe)
+    const holdK = hairRestOf(this.tuning)  // long hair resting on the body
     for (const L of this.layers) {
       this.fbParts = !!this.fb && L.def.group === 'body'
       // a layer not drawn this frame (an expression that is off, closed lashes on an open eye) is not moved either;
@@ -1651,7 +1882,11 @@ export class Puppet {
         if (d.rigid) {
           const vx = x - d.rigid[0], vy = y - d.rigid[1]
           pt[0] = rgx + vx * rc - vy * rs; pt[1] = rgy + vx * rs + vy * rc
-        } else place(x, y, L.wHead[i], fringeL === 1 ? L.dep[i] : L.dep[i] * fringeL, L.wPhys1[i], L.wPhys2[i], L.wFront[i])
+        } else {
+          place(x, y, L.wHold && holdK > 0 ? L.wHead[i] * (1 - holdK * L.wHold[i]) : L.wHead[i], fringeL === 1 ? L.dep[i] : L.dep[i] * fringeL,
+            L.wPhys1[i], L.wPhys2[i], L.wFront[i])
+          if (swayX !== 0 && L.wSway[i] > 0) pt[0] += swayX * L.wSway[i]
+        }
         if (L.skin) { this.skinOffset(L.skin, i, so); pt[0] += so[0]; pt[1] += so[1] }
         let X = pt[0], Y = pt[1]
         if (L.wTwist && L.wTwist[i] > 0) X += chinDx * L.wTwist[i]
@@ -1676,7 +1911,7 @@ export class Puppet {
             if (f && kw[k] !== 0) { dx += kw[k] * f[2 * i]; dy += kw[k] * f[2 * i + 1] }
           }
           if (dx !== 0 || dy !== 0) {
-            const a = roll * L.wHead[i], c = Math.cos(a), s = Math.sin(a)
+            const a = roll * (L.wHold && holdK > 0 ? L.wHead[i] * (1 - holdK * L.wHold[i]) : L.wHead[i]), c = Math.cos(a), s = Math.sin(a)
             const ox = dx * c - dy * s, oy = dx * s + dy * c
             X += ox; Y += oy
             if (L.outB) { L.outB[2 * i] += ox; L.outB[2 * i + 1] += oy }
@@ -1698,6 +1933,43 @@ export class Puppet {
     gl.uniform1f(this.uCut, cut)
     gl.bindVertexArray(L.vao)
     gl.drawElements(gl.TRIANGLES, L.count, gl.UNSIGNED_INT, 0)
+  }
+
+  /** The model's first frame draws everything it may draw later once first, out of sight. A browser may put off a
+   *  texture's upload (and the GPU's setup for a way of drawing) until its first use: the first blink could stall on the
+   *  closed lashes, the first glance on the eyes' masks, a first expression on its picture. Here: the irises' masks into their
+   *  framebuffer (as a glance draws them), then every texture of every layer into one pixel of the canvas, as it is drawn
+   *  plainly, and an eye's whites into the stencil with the colour off and an iris through it (as an eye at rest is drawn).
+   *  The frame's own masks and its clear (the scissor off again) come after: nothing of this shows */
+  private warm(w: number, h: number, sx: number, sy: number, ox: number, oy: number) {
+    const gl = this.gl
+    this.cold = false
+    const irises = this.layers.filter((L) => (L.def.role || '').startsWith('iris_'))
+    const soft = irises.map((L) => L.soft)
+    for (const L of irises) L.soft = 1
+    this.drawMasks(w, h, sx, sy, ox, oy)
+    irises.forEach((L, i) => { L.soft = soft[i] })
+    for (const L of this.layers) L.maskCh = -1
+    gl.enable(gl.SCISSOR_TEST)
+    gl.scissor(0, 0, 1, 1)
+    for (const L of this.layers) {
+      for (const t of [L.tex, ...L.frames, L.mask, L.talk, L.browTex]) if (t) this.drawLayer(L, t, 1)
+    }
+    const eye = this.layers.find((L) => (L.def.role || '').startsWith('eye_') && L.mask), iris = irises[0] ?? eye
+    if (eye && iris) {
+      gl.enable(gl.STENCIL_TEST)
+      gl.stencilFunc(gl.ALWAYS, 1, 0xff)
+      gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE)
+      gl.colorMask(false, false, false, false)
+      this.drawLayer(eye, eye.mask!, 1, undefined, 0.5)
+      gl.colorMask(true, true, true, true)
+      gl.stencilFunc(gl.EQUAL, 1, 0xff)
+      gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP)
+      this.drawLayer(iris, iris.tex, 1)
+      gl.disable(gl.STENCIL_TEST)
+    }
+    gl.disable(gl.SCISSOR_TEST)
+    gl.uniform1f(this.uCut, 0)
   }
 
   /** softIris: the whites of each eye whose iris sits off it (a glance, a blink), as they show this frame, into a
@@ -1801,6 +2073,7 @@ export class Puppet {
     // a full-body model takes the sideways move as a sway from the ankles (fbPose): sliding it would slide the feet
     const ox = (this.focusHead ? -hd.cx * sx : -cx2 * s / w) + 2 * (V.x + (this.fb ? 0 : M.x))
     gl.uniform4f(this.uView, sx, sy, ox, oy)
+    if (this.cold && this.prewarm) this.warm(w, h, sx, sy, ox, oy)
     this.drawMasks(w, h, sx, sy, ox, oy)
     clear()
     this.lastView = [sx, sy, ox, oy, w, h]
@@ -1891,7 +2164,7 @@ export class Puppet {
       }
       if (role.startsWith('eye_')) {
         const open = role === 'eye_L' ? P.eyeLOpen : P.eyeROpen
-        this.drawLayer(L, L.tex, smooth(0.02, 0.2, open)) // squash, don't fade: fading ghosts the lashes
+        this.drawLayer(L, L.tex, eyeFade(open, this.blinkHandover)) // squash, don't fade: fading ghosts the lashes
         L.stencilRef = 0
         if (L.mask && L.maskCh < 0) {  // its iris at rest (or softIris off): the stencil, as built
           // write the (squashed) sclera into the stencil so the iris stays inside the whites
@@ -1921,13 +2194,13 @@ export class Puppet {
           gl.uniform1i(this.uMode, 2)
           gl.uniform4f(this.uMaskSel, +(c === 0), +(c === 1), +(c === 2), +(c === 3))
           gl.uniform1f(this.uSoft, L.soft)
-          this.drawLayer(L, L.tex, smooth(0.02, 0.2, open))
+          this.drawLayer(L, L.tex, eyeFade(open, this.blinkHandover))
           gl.uniform1i(this.uMode, 0)
         } else if (parent && parent.stencilRef) {
           gl.enable(gl.STENCIL_TEST)
           gl.stencilFunc(gl.EQUAL, parent.stencilRef, 0xff)
           gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP)
-          this.drawLayer(L, L.tex, smooth(0.02, 0.2, open))
+          this.drawLayer(L, L.tex, eyeFade(open, this.blinkHandover))
           gl.disable(gl.STENCIL_TEST)
         }
         continue
@@ -1986,12 +2259,36 @@ export class Puppet {
     return hit
   }
 
+  /** The keyforms measured again, after the feel settings' turn, nod or fringe changed since the model was built: each
+   *  key's field is the clip's pose less the rig's own at that key, which turns by turn and nod, its bangs as far off the
+   *  face as fringe has them. Measured from rest as a load
+   *  measures them, so the character draws as it would built with these settings; the motion going on is kept (every
+   *  field resetPhysics resets is put back). Nothing to do for a model without keyforms */
+  retune() {
+    const K = this.kfFile
+    if (!K || !this.model) return
+    const runs = this.chainRuns.map((C) => ({ p: C.p.slice(), q: C.q.slice(), disp: C.disp.slice(), beta: C.beta.slice(), started: C.started, moving: C.moving }))
+    const chains = Object.values(this.chains).map((c) => c.map((q) => ({ ...q })))
+    const keep = { lastHead: { ...this.lastHead }, drive: { ...this.drive }, body: { ...this.body }, bust: { ...this.bust }, fbm: { ...this.fbm },
+      sway: { ...this.sway }, crouch: this.crouch, dip: this.dip, kfOff: this.kfOff }
+    this.resetPhysics()
+    this.keys = []; this.kfPair = null
+    for (const L of this.layers) L.kf = undefined
+    this.prepareKeyforms(K)
+    this.chainRuns.forEach((C, i) => { const r = runs[i]; C.p.set(r.p); C.q.set(r.q); C.disp.set(r.disp); C.beta.set(r.beta); C.started = r.started; C.moving = r.moving })
+    Object.values(this.chains).forEach((c, i) => c.forEach((q, j) => Object.assign(q, chains[i][j])))
+    Object.assign(this, { lastHead: keep.lastHead, drive: keep.drive, body: keep.body, bust: keep.bust, fbm: keep.fbm, sway: keep.sway, crouch: keep.crouch, dip: keep.dip })
+    this.kfOff = keep.kfOff
+    this.pv.roll = NaN  // the full-body pose's memo holds the measuring pose: worked out again next frame
+  }
+
   /** springs back to rest (eval / screenshots must not inherit wind sway) */
   resetPhysics() {
     for (const C of this.chainRuns) { C.p.set(C.R); C.q.set(C.R); C.disp.fill(0); C.beta.fill(0); C.started = false; C.moving = false }
     for (const c of Object.values(this.chains)) for (const q of c) Object.assign(q, spring())
     this.lastHead = { x: 0, y: 0, roll: 0 }
     this.drive.started = false
+    this.sway = swayState()
     this.body = { yaw: 0, roll: 0 }
     this.bust = { x: 0, y: 0, vx: 0, vy: 0, px: 0, py: 0 }
     this.fbm = { hs: 0, hv: 0, tilt: 0, tanTilt: 0, hem: 0, hemV: 0, breath: 0 }
@@ -2000,12 +2297,98 @@ export class Puppet {
 
   snapshot(): string { return this.canvas.toDataURL('image/png') }
 
+  /** For tools (an editor, QA): every layer drawn in the last frame, bottom first, with its mesh as that frame deformed
+   *  it: the vertices at rest and as drawn (model px, x y pairs) and the triangles (vertex index triples). A view of the
+   *  puppet's own arrays, good until the next frame: read it, never write to it */
+  meshes(): readonly MeshView[] {
+    return this.layers.filter((L) => this.shown(L)).map((L) => ({ id: L.def.id, group: L.def.group, role: L.def.role, clip: L.def.clip, rest: L.rest, out: L.out, tri: L.tri }))
+  }
 
+  /** A layer's own picture at (X, Y) of its place at rest (model px): straight RGBA, 0-255. Null outside its box, or for a
+   *  layer the model does not have. Read back from the GPU: one pixel at a time, for a click, not for every frame */
+  rgbaAt(id: string, X: number, Y: number): [number, number, number, number] | null {
+    const L = this.byId.get(id)
+    if (!L) return null
+    const c = this.texelOf(L, X, Y)
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null)
+    return c
+  }
+
+  /** What is under the drawing-buffer pixel (px, py) (from the top left) in the frame last drawn, whatever the pose: the
+   *  layers drawn there, top first, each looked up through its own mesh, so a turned head still names the hair it shows
+   *  and `rest` is the place in the layer's picture, which does not move with the pose. A layer counts where its picture's
+   *  alpha there is at least `faint`, an iris only inside its eye's whites (at least half opaque there, as the stencil
+   *  cuts it); the walk stops after `solid` layers at least half opaque. `at` is the point in model px. Each layer's
+   *  picture is its main one (a mouth's frames and an expression's talking copy are not read) */
+  layersAt(px: number, py: number, { faint = 8, solid = 2 }: { faint?: number; solid?: number } = {}): { at: [number, number]; layers: LayerHit[] } {
+    const [sx, sy, ox, oy, w, h] = this.lastView
+    const X = ((2 * px) / w - 1 - ox) / sx, Y = ((2 * py) / h - 1 - oy) / sy
+    const layers: LayerHit[] = []
+    if (!this.model) return { at: [X, Y], layers }
+    const M = this.meshes(), byId = new Map(M.map((m) => [m.id, m]))
+    let n = 0
+    for (let i = M.length - 1; i >= 0 && n < solid; i--) {
+      const m = M[i], rest = restOn(m, X, Y)
+      const c = rest && this.rgbaAt(m.id, rest[0], rest[1])
+      if (!rest || !c || c[3] < faint) continue
+      const clip = m.clip ? byId.get(m.clip) : undefined
+      if (clip) {
+        const rc = restOn(clip, X, Y), a = rc && this.rgbaAt(clip.id, rc[0], rc[1])
+        if (!a || a[3] < 128) continue
+      }
+      layers.push({ id: m.id, role: m.role, group: m.group, rgba: c, rest })
+      if (c[3] >= 128) n++
+    }
+    return { at: [X, Y], layers }
+  }
+
+  private pickFb: WebGLFramebuffer | null = null
+
+  /** straight RGBA (0-255) of a layer's texture at (X, Y) of its rest place (model px), null outside it. Leaves the
+   *  picking framebuffer bound */
+  private texelOf(L: GLLayer, X: number, Y: number): [number, number, number, number] | null {
+    const gl = this.gl, d = L.def, u = (X - d.x) / d.w, v = (Y - d.y) / d.h
+    if (!(u >= 0 && v >= 0 && u < 1 && v < 1)) return null
+    this.pickFb ??= gl.createFramebuffer()
+    const c = new Uint8Array(4)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.pickFb)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, L.tex, 0)
+    gl.readPixels(Math.floor(u * L.tw), Math.floor(v * L.th), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, c)  // premultiplied
+    return c[3] ? [c[0] * 255 / c[3], c[1] * 255 / c[3], c[2] * 255 / c[3], c[3]] : [0, 0, 0, 0]
+  }
+}
+
+/** a layer's mesh as the last frame drew it (Puppet.meshes): a view of the puppet's own arrays, good until the next frame */
+export interface MeshView {
+  readonly id: string; readonly group: string; readonly role?: string; readonly clip?: string
+  /** the vertices at rest and as drawn, model px, x y pairs */
+  readonly rest: ArrayLike<number>; readonly out: ArrayLike<number>
+  /** the triangles, vertex index triples */
+  readonly tri: ArrayLike<number>
+}
+
+/** a layer under a point (Puppet.layersAt): its picture's colour there (straight RGBA 0-255) and the place in it, at rest */
+export interface LayerHit { id: string; role?: string; group: string; rgba: [number, number, number, number]; rest: [number, number] }
+
+/** where (X, Y) of the frame is at rest on this mesh (model px), null off it */
+function restOn(m: MeshView, X: number, Y: number): [number, number] | null {
+  const o = m.out, r = m.rest, t = m.tri
+  for (let i = 0; i < t.length; i += 3) {
+    const a = 2 * t[i], b = 2 * t[i + 1], c = 2 * t[i + 2]
+    const ax = o[a], ay = o[a + 1], bx = o[b], by = o[b + 1], cx = o[c], cy = o[c + 1]
+    if ((X < ax && X < bx && X < cx) || (X > ax && X > bx && X > cx) || (Y < ay && Y < by && Y < cy) || (Y > ay && Y > by && Y > cy)) continue
+    const d = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+    if (Math.abs(d) < 1e-6) continue
+    const u = ((by - cy) * (X - cx) + (cx - bx) * (Y - cy)) / d, v = ((cy - ay) * (X - cx) + (ax - cx) * (Y - cy)) / d, w = 1 - u - v
+    if (u < -1e-4 || v < -1e-4 || w < -1e-4) continue
+    return [u * r[a] + v * r[b] + w * r[c], u * r[a + 1] + v * r[b + 1] + w * r[c + 1]]
+  }
+  return null
 }
 
 /** a keyforms.json the runtime can read safely (an untrusted file: a field of the wrong size would be read past its
  *  end): version 1, its grid in range, at most 32 keys, every field and mask exactly the grid's size in base64 */
-function keyformsFit(K: KeyformFile): boolean {
+export function keyformsFit(K: KeyformFile): boolean {
   const int = (v: unknown, lo: number, hi: number) => Number.isInteger(v) && (v as number) >= lo && (v as number) <= hi
   const pos = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v > 0
   if (K?.version !== 1 || !int(K.cols, 2, 4096) || !int(K.rows, 2, 4096) || K.cols * K.rows > 2 ** 22) return false
@@ -2118,6 +2501,48 @@ function sampleMask(m: Uint8Array, K: KeyformFile, x: number, y: number): number
   const c = Math.floor(gx), r = Math.floor(gy), tx = gx - c, ty = gy - r
   const at = (cc: number, rr: number) => m[rr * K.cols + cc]
   return ((at(c, r) * (1 - tx) + at(c + 1, r) * tx) * (1 - ty) + (at(c, r + 1) * (1 - tx) + at(c + 1, r + 1) * tx) * ty) / 255
+}
+
+/** the body's coverage field (coverField) from its texture's alpha; from its box when the page may not read the texture (another
+ *  site's, without CORS: getImageData throws on a tainted canvas) */
+function bodyCoverOf(img: HTMLImageElement, L: LayerDef, canvas: [number, number], fw: number): Field {
+  try {
+    return coverField(L, canvas, fw, (w, h, g) => {
+      const c = document.createElement('canvas'); c.width = w; c.height = h
+      const x2 = c.getContext('2d', { willReadFrequently: true })!
+      x2.drawImage(img, L.x / g, L.y / g, L.w / g, L.h / g)
+      const d = x2.getImageData(0, 0, w, h).data, a = new Float32Array(w * h)
+      for (let i = 0; i < a.length; i++) a[i] = d[4 * i + 3] / 255
+      return a
+    })
+  } catch {
+    return coverField(L, canvas, fw)
+  }
+}
+
+/** Puppet.hairHang: the hair layers' cells (alphaGrid's, as their meshes have them) joined on the lattice, and which hang from the head.
+ *  None (all of the hair swings) where a texture cannot be read */
+function hairHangOf(model: ModelDef, imgs: LayerImages[], fw: number): Hang | undefined {
+  const cell = latticeOf(model)
+  const hair = model.layers.map((L, i) => ({ L, i })).filter(({ L, i }) => L.group.startsWith('hair') && !L.rigid && imgs[i]?.main)
+  if (!hair.length) return undefined
+  const box = hair.map(({ L }) => [Math.floor(L.x / cell), Math.floor(L.y / cell), Math.ceil((L.x + L.w) / cell), Math.ceil((L.y + L.h) / cell)])
+  const ox = Math.min(...box.map((b) => b[0])), oy = Math.min(...box.map((b) => b[1]))
+  const w = Math.max(...box.map((b) => b[2])) - ox, h = Math.max(...box.map((b) => b[3])) - oy
+  const cells = new Uint8Array(w * h)
+  try {
+    hair.forEach(({ L, i }, k) => {
+      const [gx0, gy0, gx1, gy1] = box[k], cols = gx1 - gx0, rows = gy1 - gy0
+      const occ = alphaGrid([imgs[i].main, ...imgs[i].frames], cols, rows, (L.x - gx0 * cell) / cell, (L.y - gy0 * cell) / cell, L.w / cell, L.h / cell)
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (occ[r * cols + c]) cells[(gy0 - oy + r) * w + gx0 - ox + c] = 1
+    })
+  } catch {
+    return undefined
+  }
+  // the face no wider than the canvas, the bridge no more than 64 cells: an untrusted model's numbers set them
+  const face = Math.min(Math.max(0, fw), model.canvas[0])
+  const r = hangingCells(cells, w, h, Math.floor(model.anchors.neck_y / cell) - oy, Math.min(64, Math.max(1, Math.round((SWAY.bridge * face) / cell))))
+  return { ox, oy, w, h, r }
 }
 
 function coverAt(img: HTMLImageElement, L: LayerDef, under: HTMLImageElement, U: LayerDef, pts: Float32Array, cell: number) {
@@ -2269,17 +2694,17 @@ function alphaGrid(imgs: HTMLImageElement[], cols: number, rows: number, ox = 0,
 export class IdleDriver {
   nextBlink = 2; blinkT = -1; look = { x: 0, y: 0 }
   blinkRate = 1
+  /** how long each blink holds the eyes shut (s): BLINK_HOLD goes with Puppet.blinkHandover; 0: as before */
+  blinkHold = 0
   nextSaccade = 1; gaze = { x: 0, y: 0 }
   apply(P: Params, t: number, dt: number) {
     P.breath = 0.5 + 0.5 * Math.sin(t * 2.1)
     if (this.blinkT < 0 && t > this.nextBlink) this.blinkT = 0
     if (this.blinkT >= 0) {
-      // fast close (75 ms), slower open (120 ms): reads as a natural blink
+      // fast close (75 ms), shut for blinkHold, slower open (120 ms): reads as a natural blink
       this.blinkT += dt
-      const b = this.blinkT / 0.075
-      const open = b < 1 ? 1 - b : b < 2.6 ? (b - 1) / 1.6 : 1
-      P.eyeLOpen = P.eyeROpen = Math.max(0, Math.min(1, open))
-      if (b >= 2.6) { this.blinkT = -1; this.nextBlink = t + (1.8 + Math.random() * 3.8) / Math.max(0.2, this.blinkRate) }
+      P.eyeLOpen = P.eyeROpen = blinkOpen(this.blinkT, this.blinkHold)
+      if (blinkOver(this.blinkT, this.blinkHold)) { this.blinkT = -1; this.nextBlink = t + (1.8 + Math.random() * 3.8) / Math.max(0.2, this.blinkRate) }
     }
     // eyes lead the head: quick saccades toward the pointer, head follows slower
     if (t > this.nextSaccade) {

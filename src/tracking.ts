@@ -5,6 +5,7 @@
 import { FaceTracker, LOST_AFTER, V, loadFaceModel, setFaceModelFiles, type StartStep } from './runtime/tracking'
 import { defaultParams, type Params } from './runtime/params'
 import type { Driver, Host } from './base'
+import { factor } from './feel'
 import { TrackingFilter, type TrackingProfile, type TrackingSample } from './profile'
 export { TrackingFilter, parameterRule, readTrackingProfile, TRACKING_PARAMETERS } from './profile'
 export type { ParameterRule, TrackingProfile, TrackingSample, TrackingParameter } from './profile'
@@ -91,9 +92,12 @@ export async function startFaceTracking(player: Host, options: FaceTrackingOptio
   let w = 0  // how much the tracked pose shows (eases in 0.3 s after a face appears, out 0.5 s after it is lost)
   const driver: Driver = {
     order: -10,
-    update(f) {
+    update(f, host) {
       if (!t.ok) return
       t.follow = follow
+      // the character's feel settings: how far the mouth opens, how readily it smiles (near 0, never)
+      const feel = host.tuning
+      t.mouthGain = factor(feel?.mouth); t.exprGain = Math.max(1e-3, factor(feel?.expr))
       const seen = t.poll()
       t.apply(pose, f.dt)
       w = Math.max(0, Math.min(1, w + (seen ? f.dt / 0.3 : -f.dt / 0.5)))

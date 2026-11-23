@@ -5,21 +5,22 @@
 import type { AnchorName, AttachmentAnchor } from './anchors'
 export type { AnchorName, AttachmentAnchor } from './anchors'
 import { langOf, pickLabel, readModel, type Labels, type ModelMeta } from './runtime/format'
-import { FORMAT, FORMAT_VERSION, LEGACY_FORMAT, PARAM_RANGES, Puppet, defaultParams, loadBlob, type KeyformFile, type ModelDef, type Params } from './runtime/puppet'
+import { BLINK_HOLD, FORMAT, FORMAT_VERSION, LEGACY_FORMAT, PARAM_RANGES, Puppet, defaultParams, defaultTuning, loadBlob, type KeyformFile, type ModelDef, type Params, type Tuning } from './runtime/puppet'
 import { LivLivError, PlayerBase, aborted, contextGone, readBody, type LivLivErrorCode, type LoadJob, type LoadOptions, type PlayerOptions } from './base'
+import { packageModelJson } from './files'
 import { Mark } from './mark'
 import { claimCanvas } from './release'
 import { ZIP_LIMITS, isZip, unzip } from './zip'
 
 export { FORMAT, FORMAT_VERSION, LEGACY_FORMAT, PARAM_RANGES, defaultParams }
-export type { Labels, ModelDef, ModelMeta, Params }
-export { modelFiles } from './files'
+export type { Labels, ModelDef, ModelMeta, Params, Tuning }
+export { modelFiles, packageModelJson } from './files'
 export { LivLivError }
 export type { ParameterProfile, ParameterSample, ParameterRule } from './profile'
 export type { ActionId, Driver, Fit, Frame, Host, LivLivErrorCode, LoadOptions, LoadProgress, PlaybackPose, PlayerOptions, View } from './base'
 
 /** this package's version */
-export const VERSION = '0.5.1'
+export const VERSION = '0.6.0'
 
 /** where a model comes from: the URL of its model.json, of the folder holding it, or of a .livliv package (relative URLs
  *  resolve against the page); a .livliv package itself (a File or Blob: a ZIP of the folder); or its files: a FileList /
@@ -79,12 +80,18 @@ export class Player extends PlayerBase<ModelInfo> {
     super(canvas, puppet.params, options)
     this.puppet = puppet
     this.puppet.maxDpr = options.maxPixelRatio ?? 2
+    this.puppet.prewarm = true  // the first blink, glance or expression after a load doesn't wait on its pictures
     this.mark = new Mark(this.puppet.gl)
   }
 
   /** see PlayerOptions.maxPixelRatio */
   get maxPixelRatio() { return this.puppet.maxDpr }
   set maxPixelRatio(v: number) { this.puppet.maxDpr = v }
+
+  /** Blinks without a see-through iris (true, the default): halfway through a blink the open eye stays whole until it is
+   *  a thin slit, and the idle motion holds each blink shut for 35 ms. false: the blink of 0.5. Kept across loads */
+  get blinkHandover(): boolean { return this.puppet.blinkHandover }
+  set blinkHandover(on: boolean) { this.puppet.blinkHandover = !!on }
 
   /** @internal */
   protected get gl() { return this.puppet.gl }
@@ -94,6 +101,18 @@ export class Player extends PlayerBase<ModelInfo> {
   protected get clock() { return this.puppet.time }
   /** @internal */
   protected get shownExpr() { return this.puppet.expr }
+  /** @internal */
+  protected get feel() { return this.puppet.tuning }
+  /** @internal */
+  protected get ownFeel() { return { ...defaultTuning(), ...(this.puppet.model?.tuning || {}) } }
+  /** @internal */
+  protected get blinkHold() { return this.puppet.blinkHandover ? BLINK_HOLD : 0 }
+  /** turn, nod, fringe or hairRest changed (the key poses are measured in them): the keyforms are measured again, once,
+   *  before the next frame
+   *  @internal */
+  private retunePending = false
+  /** @internal */
+  protected retuned(keys: string[]) { if (keys.some((k) => k === 'turn' || k === 'nod' || k === 'fringe' || k === 'hairRest')) this.retunePending = true }
   /** @internal */
   protected seen() { return this.puppet }
 
@@ -107,28 +126,29 @@ export class Player extends PlayerBase<ModelInfo> {
   /** Loads a model (see ModelSource) and shows it in place of the one before. A load that fails keeps it; a new load
    *  replaces one still running, which rejects with an AbortError (see LoadOptions) */
   load(source: ModelSource, options: LoadOptions = {}): Promise<ModelInfo> {
-    return this.start(options, (job) => this.loadNow(source, job))
+    return this.start(options, (job) => this.loadNow(source, job, !!options.continueMotion))
   }
 
-  private async loadNow(source: ModelSource, job: LoadJob): Promise<ModelInfo> {
+  private async loadNow(source: ModelSource, job: LoadJob, keepMotion: boolean): Promise<ModelInfo> {
     const p = this.puppet, { signal } = job
     let files: Exclude<ModelSource, string | URL> | null = null
     if (typeof source === 'string' || source instanceof URL) {
       const url = new URL(String(source), document.baseURI)
+      if (/\.(vrm|glb)$/i.test(url.pathname)) throw vrmHere()  // a VRM by its URL, as a picked one is: said so, nothing fetched
       if (/\.(livliv|zip)$/i.test(url.pathname)) {
         job.progress(0)
         files = await fetchPackage(url.href, job)
         if (signal.aborted) throw signal.reason
       } else {
         job.progress(0)
-        await p.load(url.href, { pack: false, signal, onImage: (came, of) => { job.progress(came / of); if (came === of) job.build() } }).catch((e) => { throw explain(e, url.href) })
+        await p.load(url.href, { pack: false, signal, keepMotion, onImage: (came, of) => { job.progress(came / of); if (came === of) job.build() } }).catch((e) => { throw explain(e, url.href) })
       }
     } else files = source
     if (files) {
       job.build()
       const { model, image, keyforms } = await fromFiles(files)
       if (signal.aborted) throw signal.reason
-      await p.loadModel(model, image, { keyforms, signal }).catch((e) => { throw explain(e, 'model.json') })
+      await p.loadModel(model, image, { keyforms, signal, keepMotion }).catch((e) => { throw explain(e, 'model.json') })
     }
     // the model is in: from here it is this load's, whatever came after it
     // (disposed in the moment since: nothing of it may stay or be drawn)
@@ -148,7 +168,8 @@ export class Player extends PlayerBase<ModelInfo> {
     // v4 says which mark it is; before it the text "LivLiv" meant the logo
     const kind = m.meta ? m.meta.watermark?.kind ?? 'none' : m.watermark === 'LivLiv' ? 'livliv' : m.watermark ? 'text' : 'none'
     this.mark.set(kind, m.watermark ?? null, m.meta?.watermark?.center !== false)
-    this.neutral()
+    this.retunePending = false  // its keyforms were measured at its own settings
+    this.neutral(keepMotion, (id) => this.info!.expressions.some((e) => e.id === id))
     if (!this.playing) this.resize()
     return this.info
   }
@@ -173,6 +194,7 @@ export class Player extends PlayerBase<ModelInfo> {
   /** @internal */
   protected show(dt: number) {
     const p = this.puppet, f = this.frame, V = this.view, G = this.ground
+    if (this.retunePending) { this.retunePending = false; p.retune() }
     p.view = { x: V.x, y: V.y, s: V.zoom }
     p.focusHead = V.head
     p.fit = V.fit === 'whole' || V.fit === 'knee' ? V.fit : 'frame'
@@ -251,7 +273,7 @@ async function fromFiles(source: Exclude<ModelSource, string | URL>) {
       if (await isZip(b)) { const z = await unpack(b); files.clear(); z.forEach((v, k) => files.set(k, v)); break }
     }
   }
-  const json = [...files.keys()].filter(isJson).sort((a, b) => a.length - b.length)[0]
+  const json = packageModelJson(files.keys())
   if (!json && [...files.keys()].some((k) => /\.(vrm|glb)$/i.test(k))) throw vrmHere()
   if (!json) throw new LivLivError('missing-file', 'LivLiv: no model.json among the files')
   const dir = json.slice(0, json.length - 'model.json'.length)

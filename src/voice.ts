@@ -8,6 +8,7 @@ import { VoiceMeter } from './runtime/voice'
 import { SpeechPlayer, type ClipHooks } from './runtime/speech'
 import { TalkMotion } from './runtime/talk'
 import type { Driver, Host } from './base'
+import { factor } from './feel'
 
 export type { ClipHooks }
 
@@ -21,7 +22,7 @@ export interface LipSyncOptions {
 export interface LipSync {
   /** the mouth openness the voice gives now, 0..1 */
   readonly level: number
-  /** mouth sensitivity (default 1) */
+  /** mouth sensitivity (default 1), times the character's own (its tuning's `mouth`) */
   gain: number
   /** stops listening (a stream or element you passed in stays yours, and keeps playing) */
   stop(): void
@@ -77,11 +78,14 @@ function mouth(read: () => number, vowel: () => number, o: LipSyncOptions): Driv
 export async function startLipSync(player: Host, source?: MediaStream | HTMLMediaElement, options: LipSyncOptions = {}): Promise<LipSync> {
   const m = new VoiceMeter()
   await m.start(source)
-  const remove = player.use({ ...mouth(() => m.read(), () => m.vowel, options), dispose: () => m.stop() })
+  // the page's sensitivity, and the character's own over it (read each frame: a setTuning() shows at once)
+  let gain = m.gain
+  const read = () => { m.gain = gain * factor(player.tuning?.mouth); return m.read() }
+  const remove = player.use({ ...mouth(read, () => m.vowel, options), dispose: () => m.stop() })
   return {
     get level() { return m.level },
-    get gain() { return m.gain },
-    set gain(g: number) { m.gain = g },
+    get gain() { return gain },
+    set gain(g: number) { gain = g },
     stop: remove,
   }
 }

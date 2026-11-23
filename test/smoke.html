@@ -629,6 +629,285 @@
     return out
   }
 
+  /** the character's feel settings (tuning): read from its model.json (v4 names), and blink, expr and mouth leave a still
+   *  frame as it was */
+  window.runTuning = async (id) => {
+    const m = bare(await json(id)), out = {}
+    const own = { ...m, tuning: { ...m.tuning, blink: 2.5, expr: 0.5, mouth: 1.5, hair_front: 1.2 } }
+    const b = await still(await filesOf(id, { ...own, tuning: { ...own.tuning, blink: 1, expr: 1, mouth: 1 } }))
+    const p = new Player(canvas, { autoplay: false, followPointer: false, idle: false })
+    await p.load(await filesOf(id, own))
+    out.read = { ...p.tuning }
+    out.frozen = Object.isFrozen(p.tuning)
+    // the file's own settings are what plays: the idle motion's blink rate, and what drivers (lip sync, face tracking) read
+    let seen = null
+    p.use({ update(_f, host) { seen = host.tuning } })
+    p.resize()
+    out.still = changed(b.d, pixels())
+    out.playing = { blinkRate: p.idler.lv.blinkRate, mouth: seen?.mouth, expr: seen?.expr }
+    p.dispose()
+    return out
+  }
+
+  /** pixels that differ at all between two frames */
+  const differ = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++; return n }
+
+  /** setTuning() while the character plays: the frames are those of the character loaded with the same settings (kf: one
+   *  with keyforms, whose keys turn and nod change), and undefined puts a setting back */
+  window.runSetTuning = async (id, kf) => {
+    const out = {}
+    const poses = [{}, { angleX: 22, angleY: 10 }, { angleX: -18, angleY: -14, angleZ: 8, eyeBallX: 1 }, { angleY: 25, bodyX: 6, breath: 1 }]
+    /** the poses drawn (still: idle off, no time passing) by a player loaded from `model`, with setTuning(set) after */
+    const draw = async (who, model, set) => {
+      const p = new Player(canvas, { autoplay: false, followPointer: false, idle: false })
+      await p.load(await filesOf(who, model))
+      if (set) p.setTuning(set)
+      const shots = []
+      for (const P of poses) { Object.assign(p.params, P); p.resize(); shots.push(pixels()); Object.assign(p.params, Object.fromEntries(Object.keys(P).map((k) => [k, 0]))) }
+      const tuning = { ...p.tuning }, keys = p.puppet.keys.map((k) => +k.scale.toFixed(6)).join()
+      p.dispose()
+      return { shots, tuning, keys }
+    }
+    const cmp = (a, b) => a.shots.map((d, i) => differ(d, b.shots[i]))
+    // a character without keyforms: every setting the renderer reads in a still frame
+    const m = bare(await json(id))
+    const feel = { turn: 1.4, nod: 0.6, gaze: 0.5, fringe: 1.6, breath: 0.2, hair_front: 1.7 }
+    const asLoaded = await draw(id, { ...m, tuning: { ...m.tuning, ...feel } })
+    const asSet = await draw(id, m, { turn: 1.4, nod: 0.6, gaze: 0.5, fringe: 1.6, breath: 0.2, hairFront: 1.7 })
+    const plain = await draw(id, m)
+    out.plain = { set: cmp(asLoaded, asSet), moved: cmp(plain, asSet) }
+    // keyforms: the keys measured again for turn and nod; and back again
+    const k = bare(await json(kf))
+    const turned = { ...k, tuning: { ...k.tuning, turn: 1, nod: 1.3, fringe: 1.6 } }
+    const kLoaded = await draw(kf, turned), kSet = await draw(kf, k, { turn: 1, nod: 1.3, fringe: 1.6 })
+    const kOwn = await draw(kf, k)
+    out.keyforms = { set: cmp(kLoaded, kSet), moved: cmp(kOwn, kSet), keys: [kLoaded.keys, kSet.keys, kOwn.keys] }
+    {
+      const p = new Player(canvas, { autoplay: false, followPointer: false, idle: false })
+      await p.load(await filesOf(kf, k))
+      p.resize()
+      let t0 = performance.now()
+      p.puppet.update(0); p.puppet.render()
+      const frame = performance.now() - t0
+      p.setTuning({ turn: 1, nod: 1.3, fringe: 1.6 })
+      t0 = performance.now()
+      p.resize()
+      out.keyforms.ms = [Math.round(frame), Math.round(performance.now() - t0)]
+      p.setTuning({ turn: undefined, nod: null, fringe: undefined })
+      const shots = []
+      for (const P of poses) { Object.assign(p.params, P); p.resize(); shots.push(pixels()); Object.assign(p.params, Object.fromEntries(Object.keys(P).map((q) => [q, 0]))) }
+      out.keyforms.back = cmp(kOwn, { shots })
+      out.keyforms.tuning = [p.tuning.turn, p.tuning.nod, k.tuning?.turn ?? 1, k.tuning?.nod ?? 1]
+      // and the next character starts from its own settings
+      p.setTuning({ turn: 2, mouth: 0.3 })
+      await p.load(await filesOf(id, m))
+      out.next = { ...p.tuning }
+      p.dispose()
+    }
+    return out
+  }
+
+  /** long hair's swing below the shoulders: frames of a head turning and the body leaning, replayed with time passing, as
+   *  the model comes (the swing on by default), with tuning.hair_sway 0 in its file, and with setTuning({ hairSway: 0 }):
+   *  the last two must be the same frames, the first must differ from them */
+  window.runSway = async (id) => {
+    const m = bare(await json(id))
+    const play = async (model, set) => {
+      const p = new Player(canvas, { autoplay: false, followPointer: false, idle: false })
+      await p.load(await filesOf(id, model))
+      p.resize()
+      if (set) p.setTuning(set)
+      const base = p.getPose(), shots = []
+      for (let n = 0; n < 90; n++) {
+        const params = { ...base.params, angleX: 25 * Math.sin(n / 9), angleZ: 10 * Math.sin(n / 13), bodyX: 6 * Math.sin(n / 11) }
+        p.renderPose({ ...base, params }, 1 / 60)
+        if (n % 10 === 9) shots.push(pixels())
+      }
+      p.dispose()
+      return shots
+    }
+    const on = await play(m), offFile = await play({ ...m, tuning: { ...m.tuning, hair_sway: 0 } }), offSet = await play(m, { hairSway: 0 })
+    return { same: offFile.map((d, i) => differ(d, offSet[i])), swings: on.map((d, i) => differ(d, offSet[i])) }
+  }
+
+  /** player.blinkHandover: on by default; false is the renderer's switch off and no hold in the idle motion's blinks. The
+   *  eyes nearly shut (open 0.07) draw differently with it off, open eyes the same; back on is the default's frame to the
+   *  pixel, and a load keeps the switch where it was */
+  window.runBlinkSwitch = async (id) => {
+    const out = {}
+    const p = new Player(canvas, { autoplay: false, followPointer: false, idle: false })
+    await p.load(`../characters/${id}/`)
+    p.resize()
+    const base = p.getPose()
+    const shot = (open) => { p.renderPose({ ...base, params: { ...base.params, eyeLOpen: open, eyeROpen: open } }, 0); return pixels() }
+    const hold = () => { p.draw(0); return p.idler.lv.blinkHold }
+    out.default = [p.blinkHandover, p.puppet.blinkHandover, hold()]
+    const onSlit = shot(0.07), onOpen = shot(0.5)
+    p.blinkHandover = false
+    out.off = [p.blinkHandover, p.puppet.blinkHandover, hold()]
+    const offSlit = shot(0.07), offOpen = shot(0.5)
+    await p.load(`../characters/${id}/`)
+    out.kept = p.blinkHandover
+    p.blinkHandover = true
+    out.on = [p.blinkHandover, p.puppet.blinkHandover, hold()]
+    out.slit = differ(onSlit, offSlit)
+    out.open = differ(onOpen, offOpen)
+    out.back = differ(onSlit, shot(0.07))
+    p.dispose()
+    return out
+  }
+
+  /** long hair resting on the body: a still frame, then frames of the head turning and the body leaning, as the model comes
+   *  (on by default), with tuning.hair_rest 0 in its file, and with setTuning({ hairRest: 0 }): the still frames all the same,
+   *  the last two runs the same frames, the first different from them */
+  window.runRest = async (id) => {
+    const m = bare(await json(id))
+    const play = async (model, set) => {
+      const p = new Player(canvas, { autoplay: false, followPointer: false, idle: false })
+      await p.load(await filesOf(id, model))
+      p.resize()
+      if (set) p.setTuning(set)
+      const base = p.getPose()
+      p.renderPose(base, 1 / 60)
+      const still = pixels(), shots = []
+      for (let n = 0; n < 90; n++) {
+        const params = { ...base.params, angleX: 28 * Math.sin(n / 9), angleZ: 12 * Math.sin(n / 13), bodyX: 8 * Math.sin(n / 11), bodyZ: 6 * Math.sin(n / 15) }
+        p.renderPose({ ...base, params }, 1 / 60)
+        if (n % 10 === 9) shots.push(pixels())
+      }
+      p.dispose()
+      return { still, shots }
+    }
+    const on = await play(m), offFile = await play({ ...m, tuning: { ...m.tuning, hair_rest: 0 } }), offSet = await play(m, { hairRest: 0 })
+    return { still: [differ(on.still, offSet.still), differ(offFile.still, offSet.still)],
+      same: offFile.shots.map((d, i) => differ(d, offSet.shots[i])), rests: on.shots.map((d, i) => differ(d, offSet.shots[i])) }
+  }
+
+  /** the advanced entry, @livliv-dev/player/runtime: the same renderer as Player's (one copy of the code), its exports, the
+   *  warm-up off there and on in Player, and the inspection methods: meshes(), rgbaAt(), layersAt() against livliv.ai's own
+   *  pickPosed (written out here from meshes() and rgbaAt()), at rest and in turned poses */
+  window.runRuntime = async (id) => {
+    const R = await import('../dist/runtime.js'), out = {}
+    out.exports = ['Puppet', 'IdleDriver', 'LivelyIdle', 'IDLE_STYLE', 'pointAt', 'FaceTracker', 'LOST_AFTER', 'V', 'VoiceMeter', 'SpeechPlayer',
+      'envelope', 'TalkMotion', 'ActionPlayer', 'readModel', 'LIMITS', 'keyformsFit', 'defaultParams', 'defaultTuning', 'PARAM_RANGES', 'synthTrace', 'fitBox']
+      .filter((k) => R[k] === undefined)
+    out.brand = typeof R.brand?.drawWatermark
+    const p = new Player(canvas, { autoplay: false, followPointer: false, idle: false })
+    await p.load(`../characters/${id}/`)
+    out.same = p.puppet instanceof R.Puppet
+    out.warm = [p.puppet.prewarm, new R.Puppet(document.createElement('canvas')).prewarm]
+    const pu = p.puppet
+    /** livliv.ai's pickPosed core, from meshes() and rgbaAt() */
+    const restOn = (m, X, Y) => {
+      const o = m.out, r = m.rest, t = m.tri
+      for (let i = 0; i < t.length; i += 3) {
+        const a = 2 * t[i], b = 2 * t[i + 1], c = 2 * t[i + 2]
+        const ax = o[a], ay = o[a + 1], bx = o[b], by = o[b + 1], cx = o[c], cy = o[c + 1]
+        if ((X < ax && X < bx && X < cx) || (X > ax && X > bx && X > cx) || (Y < ay && Y < by && Y < cy) || (Y > ay && Y > by && Y > cy)) continue
+        const d = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+        if (Math.abs(d) < 1e-6) continue
+        const u = ((by - cy) * (X - cx) + (cx - bx) * (Y - cy)) / d, v = ((cy - ay) * (X - cx) + (ax - cx) * (Y - cy)) / d, w = 1 - u - v
+        if (u < -1e-4 || v < -1e-4 || w < -1e-4) continue
+        return [u * r[a] + v * r[b] + w * r[c], u * r[a + 1] + v * r[b + 1] + w * r[c + 1]]
+      }
+      return null
+    }
+    const site = (px, py) => {
+      const [sx, sy, ox, oy, w, h] = pu.lastView, X = ((2 * px) / w - 1 - ox) / sx, Y = ((2 * py) / h - 1 - oy) / sy
+      const M = pu.meshes(), byId = new Map(M.map((m) => [m.id, m])), hits = []
+      let solid = 0
+      for (let i = M.length - 1; i >= 0 && solid < 2; i--) {
+        const m = M[i], rest = restOn(m, X, Y), c = rest && pu.rgbaAt(m.id, rest[0], rest[1])
+        if (!rest || !c || c[3] < 8) continue
+        const clip = m.clip ? byId.get(m.clip) : undefined
+        if (clip) { const rc = restOn(clip, X, Y), a = rc && pu.rgbaAt(clip.id, rc[0], rc[1]); if (!a || a[3] < 128) continue }
+        hits.push(`${m.id}@${c[3].toFixed(0)}`)
+        if (c[3] >= 128) solid++
+      }
+      return hits.join(',')
+    }
+    const poses = [{}, { angleX: 25, angleY: 10 }, { angleX: -20, angleZ: 12, eyeBallX: 1 }, { eyeLOpen: 0, eyeROpen: 0 }]
+    out.cases = 0; out.wrong = []; out.named = new Set()
+    for (const P of poses) {
+      Object.assign(p.params, { angleX: 0, angleY: 0, angleZ: 0, eyeBallX: 0, eyeLOpen: 1, eyeROpen: 1 }, P); p.resize()
+      const w = canvas.width, h = canvas.height
+      for (let gy = 1; gy < 12; gy++) for (let gx = 1; gx < 9; gx++) {
+        const px = Math.round((gx / 9) * w), py = Math.round((gy / 12) * h)
+        const got = pu.layersAt(px, py), mine = got.layers.map((l) => `${l.id}@${l.rgba[3].toFixed(0)}`).join(','), ref = site(px, py)
+        out.cases++
+        if (mine !== ref) out.wrong.push(`${JSON.stringify(P)} ${px},${py}: ${mine} / ${ref}`)
+        got.layers.forEach((l) => out.named.add(l.group))
+      }
+    }
+    out.named = [...out.named].sort().join(',')
+    const meshes = pu.meshes()
+    out.meshes = { n: meshes.length, tri: meshes.every((m) => m.tri.length % 3 === 0 && m.rest.length === m.out.length) }
+    const face = meshes.find((m) => m.id === 'face') ?? meshes.find((m) => m.group === 'head')
+    const mid = (k) => { let t = 0; for (let i = k; i < face.rest.length; i += 2) t += face.rest[i]; return t / (face.rest.length / 2) }
+    out.rgba = face ? pu.rgbaAt(face.id, mid(0), mid(1)) : null
+    out.outside = pu.rgbaAt(meshes[0].id, -10, -10)
+    // reading never changes a frame
+    const before = pixels(); pu.layersAt(10, 10); pu.rgbaAt(meshes[0].id, 1, 1); p.resize()
+    out.drawSame = differ(before, pixels())
+    p.dispose()
+    return out
+  }
+
+  /** the same character loaded again while it moves (an editor's change): with continueMotion the next frame goes on from
+   *  the last, as any frame from the one before; without it the motion starts again at rest. Seeded, frame by frame */
+  window.runContinue = async (id) => {
+    const real = Math.random
+    let seed = 5
+    Math.random = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+    const files = await filesOf(id, bare(await json(id)))
+    const out = {}
+    for (const go of [true, false]) {
+      const p = new Player(canvas, { autoplay: false, followPointer: false })
+      await p.load(files)
+      p.use({ update(f) { f.params.angleX += 22 * Math.sin(f.time * 2.2); f.params.angleZ += 9 * Math.sin(f.time * 1.7) } })
+      p.setExpression(p.expressions.at(-1).id)
+      let last = null, most = 0, step = 0
+      const frame = () => { p.draw(1 / 60); const d = pixels(); const c = last ? changed(last, d) : 0; last = d; return c }
+      for (let i = 0; i < 150; i++) { const c = frame(); if (i > 60) most = Math.max(most, c) }
+      await p.load(files, { continueMotion: go })
+      step = frame()
+      out[go ? 'go' : 'rest'] = { most, step, expr: Object.values(p.puppet.expr).some((v) => v > 0.5) }
+      p.dispose()
+    }
+    Math.random = real
+    return out
+  }
+
+  /** the long hair's setup costs the same for any face size: a face 1 000 000 px wide (the bridge across gaps in the hair is a
+   *  share of it), the finest lattice, a 4096 px canvas and two opaque hair layers along its far edges, so that the hair's
+   *  lattice spans 2048 x 2048 cells (within the limits on layers and vertices), loads in about the time of the same model
+   *  with its own face. Each on a canvas of its own, the wide-faced one first: a load that came after another waits for that
+   *  one's drawing to finish on the GPU */
+  window.runWideFace = async (id) => {
+    const m = bare(await json(id)), S = 4096
+    // two hair layers alone, drawn with the body's (mostly opaque) picture, as large as the limit on vertices lets them be
+    const body = m.layers.find((L) => L.id === 'body')
+    const strip = (y, n) => ({ ...body, id: `x_hair_${n}`, group: 'hair_back', role: undefined, x: -S, y, w: 3 * S - 1, h: 2900 })
+    const layers = [strip(-S, 'a'), strip(2 * S - 2901, 'b')]
+    const big = { ...m, canvas: [S, S], rig: { ...m.rig, lattice: 6 }, layers, expressions: [] }
+    const wide = { ...big, expressions: [], anchors: { ...big.anchors, face: [S / 2 - 5e5, m.anchors.face[1], S / 2 + 5e5, m.anchors.face[3]] } }
+    const time = async (model) => {
+      const c = document.createElement('canvas')
+      c.style.cssText = 'width: 320px; height: 400px'
+      document.body.append(c)
+      const p = new Player(c, { autoplay: true, followPointer: false })
+      const files = await filesOf(id, model)
+      const t0 = performance.now()
+      let error = null
+      await p.load(files).catch((e) => { error = e.message })
+      const ms = performance.now() - t0
+      p.dispose({ release: true }); c.remove()
+      return { ms: Math.round(ms), error }
+    }
+    const first = await time(wide)
+    return { wide: first, plain: await time(big) }
+  }
+
   /** hostile packages: each must be refused (or, for broken keyforms, played on the rig alone), the model before kept */
   window.runHostile = async (id, kfId) => {
     const player = new Player(canvas, { autoplay: false, followPointer: false })

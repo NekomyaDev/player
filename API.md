@@ -2,7 +2,7 @@
 
 A lightweight 2.5D character player for the web. `Player` animates a LivLiv model (a `.livliv` package, or its folder:
 `model.json` and `textures/`) on a `<canvas>` with WebGL2; VRM and PNGTuber characters play on the same API through
-`@livliv-dev/player/body`. The core has no dependencies (~75 KB minified, ~30 KB gzipped, the renderer and the idle motion included).
+`@livliv-dev/player/body`. The core has no dependencies (~110 KB minified, ~44 KB gzipped, the renderer and the idle motion included).
 Lip sync and face tracking are separate imports, so you only ship them if you use them.
 
 > Install it with `npm install @livliv-dev/player`, or build it from this repository (see [Building](#building)).
@@ -52,6 +52,12 @@ load, as they are ([FORMAT-v3.md](FORMAT-v3.md)).
 with a project or package it again. From a URL it reads `model.json` as `load()` does (a model `load()` refuses is
 refused) and fetches every image and file it names, rejecting if one does not come; a package or files you pass come
 back unpacked, as they are. `model.json` is unchanged, with its licence and its mark, and the limits are `load()`'s.
+Its paths are safe to write out as files: it refuses a name that would leave the package (absolute, on a drive, or with a
+`.` or `..` segment), as opening a `.livliv` does, and also, more strictly than `load()`, one with a control character or
+`:` (on Windows, `a.webp:x` names a stream inside `a.webp`). `#` and `?` are names like any other.
+
+`packageModelJson(paths)` says which `model.json` among a package's file paths is its own: the shortest one (the first
+of those as long). It is the one `load()` plays, for a tool that reads the files before handing them to the player.
 
 ## Player
 
@@ -98,6 +104,7 @@ paths outside the package, an encrypted or oversized ZIP are refused with an err
 |---|---|
 | `signal` | an `AbortSignal` that calls the load off: it rejects with an `AbortError` (or the signal's own reason) and the character before stays |
 | `onProgress` | called with `{ step: 'download', progress }` as the files come in (0..1, always rising; bytes for a package, images for a folder; where the size is not known, 0 and then 1), then once with `{ step: 'build' }` as the character goes in |
+| `continueMotion` | `true`: the new character takes the motion over where the one before is: the springs of its hair and swinging pieces, the body's lag behind the head, the long hair's swing, and the expression showing (if it has it). For the same character edited and loaded again: its next frame goes on from its last, where by default a new character starts at rest. A feel setting changed with an editor's slider needs no load at all: see `setTuning()` |
 | `poster` | the URL of a picture to show until the first frame (a featured character's `cover.webp`). It is the canvas's CSS background, so it fits the canvas's box, adds nothing to the page, and the canvas's own background comes back after. Only while the canvas shows nothing yet: over a character, that one stays until the next is ready |
 
 **A new `load()` replaces one still running**, so the last one asked for is the one that plays, and the download before it
@@ -183,6 +190,55 @@ not a number counts as the default.
   of following the pointer; `lookAt(null)` goes back to the pointer. Needs `idle`.
 - `blink()`: blinks now (with `idle`).
 
+### Feel settings: `tuning` and `setTuning()`
+
+A model carries its owner's feel settings (`tuning` in model.json), each a factor with 1 the default. The player plays
+the character with them; `player.tuning` gives them as they play now (a frozen copy), and `setTuning(changes)` changes
+some while it plays, without loading it again, so an editor's sliders show at once:
+
+```js
+player.setTuning({ turn: 1.3, blink: 0.6 })   // the next frame shows them (on a paused player, call resize())
+player.setTuning({ turn: undefined })         // back to the model's own
+player.tuning.turn                            // 1 (if the model says nothing)
+```
+
+| setting | in model.json (format 4) | what it scales |
+|---|---|---|
+| `turn` | `turn` | how far the head turns and tilts, and the body with it |
+| `nod` | `nod` | how far the head nods, on top of `turn` |
+| `hair` | `hair` | how freely the hair and the swinging pieces swing |
+| `hairFront` | `hair_front` | the bangs' swing, in place of `hair` |
+| `hairBack` | `hair_back` | long hair's and the swinging pieces' swing, in place of `hair` |
+| `hairSway` | `hair_sway` | how far long hair swings sideways below the shoulders, times `hairBack`; 0 off |
+| `hairRest` | `hair_rest` | how much long hair lying on the body below the neck goes with the body, not the head, 0..1 (more counts as 1); 0 off, 1 when the model says nothing |
+| `breath` | `breath` | breathing |
+| `gaze` | `gaze` | the share of the iris's travel the eyes use, 0..1 (more counts as 1) |
+| `fringe` | `fringe` | how far the bangs stand off the face: their depth times this, 0 on the face, at most about twice |
+| `blink` | `blink` | how often the idle motion blinks (at 0 still now and then, every 9–28 s) |
+| `expr` | `expr` | how readily face tracking reads a smile |
+| `mouth` | `mouth` | how far face tracking and live lip sync open the mouth |
+
+A value is a number from 0 to 10, as in a model file (above 10 counts as 10); `undefined` or `null` puts a setting back to
+the model's own.
+A name that is no setting, or a value that is no number from 0 up, throws a `TypeError` and changes nothing. Each
+`load()` starts again from the new character's own settings. At 1 (or not set) a setting changes nothing: a model
+without `tuning` plays as it always has. Changing `turn`, `nod`, `fringe` or `hairRest` on a model with keyforms
+measures its key poses again before the next frame, so it draws exactly as it would loaded with those settings.
+
+### Blinks
+
+The idle motion blinks every few seconds (`tuning.blink` sets how often). Halfway through a blink the open eye hands
+over to the closed one: it is drawn whole until it is squashed to a thin slit, then goes in a short step, and the idle
+motion holds each blink shut for 35 ms, so every blink shows the closed eye, at 60 fps and in a 30 fps recording. Eyes
+that face tracking or your own `params` half close get the same hand-over (the hold is the idle motion's).
+
+```js
+player.blinkHandover = false   // the blink of 0.5: the open eye fades from eye-open 0.2 down over the closed one
+```
+
+With it off, the open eye fades out while the closed one comes in under it, which showed the iris as a see-through
+grey smear for a few frames of every blink. Either way a frame with the eyes open 0.2 or more, or shut, is the same.
+
 ### Placement and the loop
 
 - `view`: `{ x, y, zoom, head, fit }`. `x`, `y` move the character by shares of the canvas (y up), `zoom` scales it about the
@@ -191,6 +247,8 @@ not a number counts as the default.
 - `play()`, `pause()`, `playing`. The loop also skips drawing while the canvas is scrolled out of view (unless `renderWhenHidden`).
 - `resize()`: draws now at the canvas's current size. Only needed after resizing a paused player.
 - `maxPixelRatio`: as the option, and it can be changed at any time.
+- `blinkHandover`: blinks without a see-through iris, `true` by default; `false` blinks as 0.5 did (see [Blinks](#blinks)).
+  Kept across loads. `Player` only: VRM and PNGTuber characters blink their own way.
 - `snapshot()`: the pose as it is now, as a PNG data URL (with the mark).
 - `getPose()`, `onFrame`, `renderPose()`: the pose as drawn, to record it or show it again, see [Recorded poses](#recorded-poses).
 - `getAnchor('head' | 'body')`: where the head or the torso was drawn, see [Attachment points](#attachment-points).
@@ -284,7 +342,8 @@ sync.stop()
 ```
 
 Options for both: `motion` (0..2, default 1: how much the voice moves the head; 0 = mouth only) and `bounce` (hop on
-syllables, default false). `startLipSync` returns `{ level, gain, stop() }`. A stream or element you pass in stays
+syllables, default false). `startLipSync` returns `{ level, gain, stop() }`: `gain` is the mouth's sensitivity (default
+1), times the character's own (its [feel setting](#feel-settings-tuning-and-settuning) `mouth`). A stream or element you pass in stays
 yours: `stop()` leaves it playing. Browsers let an `<audio>` element be routed through Web Audio only once, so after
 `startLipSync(player, el)` that element always plays through the player's audio context (it still plays normally).
 
@@ -341,7 +400,8 @@ const tracking = await startFaceTracking(player).catch((e) => {
 | `profile` | | a response profile for the camera's values, see [Response profiles](#response-profiles) |
 
 `tracking.video` is the camera's `<video>` element, for a preview (null with a `trace`). The tracker owns its stream
-and stops it on `stop()`: show the element, don't stop its tracks.
+and stops it on `stop()`: show the element, don't stop its tracks. The character's [feel settings](#feel-settings-tuning-and-settuning)
+`mouth` and `expr` set how far the tracked mouth opens and how readily a smile is read, each frame.
 
 By default the wasm comes from jsDelivr (`@mediapipe/tasks-vision@1.1.1/wasm`) and the model from Google's
 `mediapipe-models` bucket. In production, host those files yourself and pass `wasmUrl` / `modelUrl`. While no face is
@@ -387,6 +447,8 @@ const remove = player.use({
 remove()
 ```
 
+`update(frame, player)` gets the frame and the player (any `Host`: one with `use()`, `blink()` and, optionally,
+`tuning`, the [feel settings](#feel-settings-tuning-and-settuning)).
 `frame` has `params` (the pose so far), `dt`, `time`, `tracked` (a face tracker drives the head), `add(offsets)`,
 `move` (`{ x, y, s }`: move / scale the picture this frame), `talk` (a talking bob, a share of the canvas, <= 0: lip sync
 writes it) and `grounded` (a full-body character, whose feet stay on the ground: a move down crouches it, `move.x`
@@ -432,7 +494,11 @@ await vrm.load('/avatars/me.vrm')            // a URL, a File, or files picked
   A VRM carries its author's terms, and `load()` gives them in `model.meta` (`VrmTerms`), 1.0 and 0.x said alike: `author`,
   `license`, `use` (who may play it), `commercial`, `violence`, `sexual`, `redistribution` and `modification` (1.0 only), the
   file's own words in `raw`. The player does not enforce them. A page playing other people's avatars should show them and
-  keep to them, as you would with a LivLiv package's `meta.license`.
+  keep to them, as you would with a LivLiv package's `meta.license`. A VRM 1.0 whose licence URL is not VRM's own (the
+  author's terms page, an exporter's field filled in) plays too, with that URL in `license.url`; three-vrm alone refuses it.
+  Node constraints that depend on each other in a circle are left out, with a warning in the console, rather than the
+  whole file refused. A file that cannot play says why in the exporter's terms (bones the humanoid lacks, a VRM without
+  its meta, a VRM version this player does not read).
 - **Your own**: anything with `load(files)`, `render(canvas, pose, w, h, dt)`, `head()` and `dispose()` (the `Body`
   type), and if it cares which canvas it gets, `attach(canvas)`. One that draws with WebGL can also have `context()`, returning
   its context, so that `contextLost` and `dispose({ release })` work for it. `pose` has the params after the idle motion and the
@@ -442,9 +508,54 @@ await vrm.load('/avatars/me.vrm')            // a URL, a File, or files picked
 A failed `load()` keeps the character before, as on a Player. A canvas has one kind of context for good: a PNGTuber draws in 2D, a Player and a VRM in WebGL2, so a PNGTuber on a canvas that was a Player's (or the other way round) is refused with an error; give it its own.
 A BodyPlayer takes the same `load()` options and its errors are the same, with one difference: a Body swaps its character
 inside its own `load`, which cannot be interrupted, so a character already going in finishes and the newer one follows.
-Downloads and loads still waiting are replaced, as on a Player. It draws no mark and has no `poke` or `canvasToModel`;
+Downloads and loads still waiting are replaced, as on a Player. Its [feel settings](#feel-settings-tuning-and-settuning)
+start at 1 with each load (a body's files carry none); `setTuning()` changes them, and `blink`, `expr` and `mouth` count.
+It draws no mark and has no `poke` or `canvasToModel`;
 `view.head` is not used. `onContextLost` and `dispose({ release })` are for a VRM; a PNGTuber has no context to lose. Live2D models (`.moc3`) are not supported:
 reading them takes Live2D's proprietary Cubism Core, under its own licence.
+
+## Advanced: `@livliv-dev/player/runtime`
+
+The renderer and the motion modules underneath `Player` and `BodyPlayer`, for code that runs its own frame loop and
+drives them itself (livliv.ai does): `Puppet`, `IdleDriver`, `LivelyIdle` (`IDLE_STYLE`, `pointAt`), `ActionPlayer`,
+`TalkMotion`, `FaceTracker` (`LOST_AFTER`, `V`, `loadFaceModel`), `VoiceMeter`, `SpeechPlayer` (`envelope`), the face
+traces (`synthTrace` …), `readModel` with `LIMITS` and `keyformsFit`, the full-body framing (`fitBox`, `Fit`), the mark's
+drawing (`brand`), and their types.
+
+**It is outside the compatibility promise of the other entries**: it is the runtime as it is, and a minor version may
+change it. Pin the exact version (`"@livliv-dev/player": "0.6.0"`, not `^0.6.0`) and read the changelog before moving on.
+It shares its code with the other entries, so a page importing both carries one copy; MediaPipe still loads only when
+face tracking starts.
+
+```js
+import { Puppet, defaultParams } from '@livliv-dev/player/runtime'
+
+const p = new Puppet(canvas)
+await p.load('/characters/k01/')
+Object.assign(p.params, { angleX: 15 })
+p.update(1 / 60); p.render()                     // your loop: update(dt), then render()
+```
+
+What the high-level players add on top is theirs, not the renderer's. The idle motion, the drivers and the mark are not
+in `Puppet`, and neither is the first frame's warm-up: `puppet.prewarm` is off by default (Player turns it on; see the
+changelog for 0.6.0). The feel settings are `puppet.tuning`, read each frame; after changing `turn`, `nod`, `fringe` or
+`hairRest` on a model with keyforms, call `puppet.retune()`. The blink hand-over is the renderer's
+(`puppet.blinkHandover`, on); the hold that goes with it is the idle motion's: `LivelyIdle` and `IdleDriver` have
+`blinkHold` (0, as before 0.6). Set it to `BLINK_HOLD` while the hand-over is on, as Player does, or a frame often misses
+the bottom of a blink and it never shows the closed eye. `eyeFade`, `blinkOpen` and `blinkOver` are the curves they use.
+
+For tools that ask what is drawn where (an editor's picking, QA), three methods read the last frame without changing it:
+
+- `meshes()`: each layer drawn, bottom first: `{ id, group, role, clip, rest, out, tri }`, the vertices at rest and as
+  drawn (model px, x y pairs) and the triangles. A view of the renderer's own arrays, typed read-only, good until the
+  next frame: never write to it.
+- `rgbaAt(id, x, y)`: a layer's own picture at a point of its place at rest (model px), straight RGBA 0–255; null outside
+  it. Read back from the GPU: for a click, not for every frame.
+- `layersAt(px, py, { faint = 8, solid = 2 })`: the layers under a drawing-buffer pixel in the last frame, whatever the
+  pose, top first: `{ at, layers: [{ id, role, group, rgba, rest }] }`. Each is looked up through its own mesh, so a
+  turned head still names the hair it shows, and `rest` is the place in the layer's picture. A layer counts where its
+  alpha is at least `faint`, an iris only inside its eye's whites; the walk stops after `solid` layers at least half
+  opaque.
 
 ## Untrusted files
 

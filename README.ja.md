@@ -7,7 +7,7 @@
 
 <p align="center">
   超軽量の Web 向けキャラクタープレイヤー。リップシンクと Web カメラのフェイストラッキングに対応し、数行のコードでページや配信画面、アプリに組み込めます。<br>
-  さまざまなスタイルの厳選キャラクター 25 体を同梱。すぐに使えます。
+  さまざまなスタイルの厳選キャラクター 23 体を同梱。すぐに使えます。
 </p>
 
 <p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">中文</a> · <b>日本語</b> · <a href="README.vi.md">Tiếng Việt</a></p>
@@ -18,7 +18,7 @@
 - リップシンク（マイク、音声、動画）と Web カメラのフェイストラッキング（MediaPipe）はブラウザ内で動作し、必要なときだけ読み込めます
 - LivLiv・VRM・PNGTuber のキャラクターを同じ API で再生
 - 全身のキャラクターは足を地面に着けたまま、揺れ、しゃがみ、話すと上半身が沈みます。表示範囲も選べます
-- [`characters/`](characters/) に厳選キャラクター 25 体。すぐに使えます
+- [`characters/`](characters/) に厳選キャラクター 23 体。すぐに使えます
 
 ## 試してみる
 
@@ -78,13 +78,15 @@ const png = new BodyPlayer(canvasB, new PngBody())
 await png.load({ closed: 'me-closed.png', open: 'me-open.png' })
 ```
 
-API の全体は [API.md](API.md)（英語）にあります：オプション、パラメーター、表情とアクション、ドライバー、記録したポーズと取り付け位置、VRM と PNGTuber、信頼できないファイルの上限、モデルパッケージ、フォーマットのバージョン。LivLiv のパッケージ形式（`.livliv`、`model.json` v4）は [FORMAT.md](FORMAT.md)、JSON Schema は [`schema/`](schema/) にあります。v4 より前に書き出したパッケージは [FORMAT-v3.md](FORMAT-v3.md) のとおりで、そのまま再生できます。
+API の全体は [API.md](API.md)（英語）にあります：オプション、パラメーター、表情とアクション、動きの調整、ドライバー、記録したポーズと取り付け位置、VRM と PNGTuber、信頼できないファイルの上限、モデルパッケージ、フォーマットのバージョン。LivLiv のパッケージ形式（`.livliv`、`model.json` v4）は [FORMAT.md](FORMAT.md)、JSON Schema は [`schema/`](schema/) にあります。v4 より前に書き出したパッケージは [FORMAT-v3.md](FORMAT-v3.md) のとおりで、そのまま再生できます。
+
+**0.6 の新機能：** 頭や体が動くと、肩より下の長い髪が左右に揺れます（モデルの `tuning.hair_sway` で揺れ幅を調整、0 で無効）。体にかかった長い髪は、頭ではなく体について動きます（`tuning.hair_rest`）。まばたきの途中で虹彩が半透明に透けて見えることもなくなりました。キャラクターの動きの調整（`tuning`：首の回り具合、髪の揺れ、まばたきの頻度など）は `player.tuning` で読み取り、`player.setTuning()` で再生中にそのまま変更できるので、エディターのスライダーに使えます。`load(source, { continueMotion: true })` を使えば、編集のたびに読み込み直しても動きが途切れません。Blender から書き出した VRM も再生できるようになりました。独自のフレームループを回すコードは、上級者向けの入口 `@livliv-dev/player/runtime` からレンダラーそのものを使えます。0.5 向けに書いたページは変更不要です。詳しくは API.md の [Feel settings](API.md#feel-settings-tuning-and-settuning) をご覧ください。
 
 > npm パッケージに入っているのはプレイヤーだけです。厳選キャラクターはこのリポジトリの [`characters/`](characters/) にあります。使うキャラクターをライセンスと一緒にページのそばにコピーしてください。
 
 ## 厳選キャラクター
 
-`characters/` には 25 体のキャラクターが入っていて、そのまま `load()` できます。大半は LivLiv が制作したもので、クレジット（「キャラクター：LivLiv（livliv.ai）」）を入れれば無料で使え、個人なら商用利用もできます。キャラクター自体やグッズの販売、AI モデルの学習には使えません。これらには Apache License は**適用されません**。条文は [characters/LICENSE.md](characters/LICENSE.md) をご覧ください。Kujira、Kujira Q、Pen は他の方の作品に基づくもので、条件は [characters/CREDITS.md](characters/CREDITS.md) にあります。
+`characters/` には 23 体のキャラクターが入っていて、そのまま `load()` できます。大半は LivLiv が制作したもので、クレジット（「キャラクター：LivLiv（livliv.ai）」）を入れれば無料で使え、個人なら商用利用もできます。キャラクター自体やグッズの販売、AI モデルの学習には使えません。これらには Apache License は**適用されません**。条文は [characters/LICENSE.md](characters/LICENSE.md) をご覧ください。Kujira、Kujira Q、Pen は他の方の作品に基づくもので、条件は [characters/CREDITS.md](characters/CREDITS.md) にあります。
 
 **0.5.0 の新機能：全身のキャラクター。** 頭から足まで描かれ、地面に立っています。足を着けたまま揺れ、しゃがみ、話すと上半身が沈みます。厳選キャラクターのうち Tsubaki、Neve、Juno、Viola（f05〜f08）の 4 体が全身です。表示範囲は `player.view.fit` で `'frame'`（既定）、`'knee'`、`'whole'` から選べます。詳しくは API.md の [Full-body characters](API.md#full-body-characters) をご覧ください。
 

@@ -87,27 +87,46 @@ export class VrmBody implements Body {
   async load(files: Map<string, Blob>) {
     const entry = [...files].find(([n]) => /\.(vrm|glb)$/i.test(n))
     if (!entry) throw new LivLivError('missing-file', 'LivLiv: no .vrm file among the files')
-    await checkGlb(entry[1], entry[0], !this.options.configureLoader)
-    const [THREE, { GLTFLoader }, { VRMLoaderPlugin, VRMUtils }] = await Promise.all([
+    const json = await checkGlb(entry[1], entry[0], !this.options.configureLoader)
+    const [THREE, { GLTFLoader }, { VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils }] = await Promise.all([
       import('three'), import('three/examples/jsm/loaders/GLTFLoader.js'), import('@pixiv/three-vrm')]).catch((e) => {
       throw new LivLivError('unreachable', `LivLiv: could not load three or @pixiv/three-vrm, which a VRM needs: are they installed, and can this page reach them? (${(e as Error).message})`)
     })
     this.THREE = THREE
-    const loader = new GLTFLoader()
-    loader.register((parser) => new VRMLoaderPlugin(parser))
-    this.options.configureLoader?.(loader)
-    const url = URL.createObjectURL(entry[1])
+    const v1 = json.extensions?.VRMC_vrm, v0 = json.extensions?.VRM
+    // a VRM 1.0's terms come to the page as the file says them (VrmTerms), whatever licence its URL names: three-vrm alone
+    // refuses any but VRM's own, and an exporter's licence field set to the author's page left the avatar unplayable
+    const licence = v1?.meta?.licenseUrl
+    const accept = ['https://vrm.dev/licenses/1.0/', ...(typeof licence === 'string' ? [licence] : [])]
+    const parse = async (constraints: boolean) => {
+      const loader = new GLTFLoader()
+      loader.register((parser) => new VRMLoaderPlugin(parser, {
+        metaPlugin: new VRMMetaLoaderPlugin(parser, { acceptLicenseUrls: accept }),
+        // node constraints that depend on each other in a circle: without them (they turn a few helper bones)
+        ...(constraints ? {} : { nodeConstraintPlugin: { name: 'VRMC_node_constraint', afterRoot: async () => {} } as never }),
+      }))
+      this.options.configureLoader?.(loader)
+      const url = URL.createObjectURL(entry[1])
+      try { return await loader.loadAsync(url) } finally { URL.revokeObjectURL(url) }
+    }
     let gltf
     try {
-      gltf = await loader.loadAsync(url)
+      gltf = await parse(true).catch((e) => {
+        if (!/VRMNodeConstraintManager: Circular dependency/.test((e as Error)?.message)) throw e
+        console.warn(`LivLiv: ${entry[0]}'s node constraints depend on each other in a circle: it plays without them`)
+        return parse(false)
+      })
     } catch (e) {
-      throw new LivLivError('not-a-model', `LivLiv: ${entry[0]} is not a VRM this player can read (${(e as Error).message})`, { cause: e })
-    } finally {
-      URL.revokeObjectURL(url)
+      throw unreadable(entry[0], e)
     }
     const vrm = gltf.userData.vrm as VRM | undefined
     if (!vrm) {
       VRMUtils.deepDispose(gltf.scene)
+      const ext = v1 ?? v0
+      if (v1 && !['1.0', '1.0-beta'].includes(String(v1.specVersion))) throw new LivLivError('not-a-model', `LivLiv: ${entry[0]} is VRM ${String(v1.specVersion).slice(0, 20)}, and this player reads VRM 1.0 and 0.x`)
+      if (ext && !ext.meta) throw new LivLivError('invalid', `LivLiv: ${entry[0]} is a VRM without its meta (the avatar's name, author and terms), which a VRM must have: fill it in in the exporter (VRM Add-on for Blender: the VRM Meta panel) and export again`)
+      if (ext && !ext.humanoid) throw new LivLivError('invalid', `LivLiv: ${entry[0]} is a VRM without a humanoid (its bones by name), which a VRM must have: set it up in the exporter and export again`)
+      if (ext) throw new LivLivError('not-a-model', `LivLiv: ${entry[0]} has VRM data this player cannot read`)
       throw new LivLivError('not-a-model', `LivLiv: ${entry[0]} is a glTF without VRM data (exported as plain glTF? VRM exporters write a .vrm)`)
     }
     let meshes = 0
@@ -262,6 +281,13 @@ export class VrmBody implements Body {
   }
 }
 
+/** what three.js or three-vrm said when a file would not load, in words for the person who exported it */
+function unreadable(name: string, e: unknown): LivLivError {
+  const msg = String((e as Error)?.message ?? e), bones = msg.match(/humanoid bones are required but not exist: (.+)$/)
+  if (bones) return new LivLivError('invalid', `LivLiv: ${name} lacks humanoid bones VRM requires (${bones[1].slice(0, 200)}): assign them in the exporter (VRM Add-on for Blender: the VRM Humanoid panel) and export again`, { cause: e })
+  return new LivLivError('not-a-model', `LivLiv: ${name} is not a VRM this player can read (${msg.slice(0, 300)})`, { cause: e })
+}
+
 /** the VRM's meta in one shape, whichever spec wrote it */
 function vrmTerms(m: Record<string, unknown> | undefined): VrmTerms | undefined {
   if (!m) return undefined
@@ -289,10 +315,17 @@ function vrmTerms(m: Record<string, unknown> | undefined): VrmTerms | undefined 
 
 const COMPRESSED: Record<string, string> = { KHR_draco_mesh_compression: 'Draco', EXT_meshopt_compression: 'Meshopt', KHR_texture_basisu: 'KTX2' }
 
+/** what checkGlb reads of a VRM's JSON */
+interface GlbJson {
+  buffers?: { uri?: string }[]; images?: { uri?: string; bufferView?: number }[]; bufferViews?: { byteOffset?: number; byteLength?: number }[]
+  accessors?: { count?: number }[]; meshes?: { primitives?: { attributes?: { POSITION?: number } }[] }[]; extensionsUsed?: string[]
+  extensions?: { VRMC_vrm?: { specVersion?: string; meta?: { licenseUrl?: unknown }; humanoid?: unknown }; VRM?: { meta?: unknown; humanoid?: unknown } }
+}
+
 /** a .vrm looked through before three.js sees it, as any file from anyone: a GLB, no outside files (it would make the page
  *  fetch them), its compression one the page can decode, and images and meshes within VRM_LIMITS, read from the file's
  *  headers before anything is decoded */
-async function checkGlb(file: Blob, name: string, noDecoders: boolean) {
+async function checkGlb(file: Blob, name: string, noDecoders: boolean): Promise<GlbJson> {
   const bad = (why: string, code: LivLivErrorCode = 'invalid'): never => { throw new LivLivError(code, `LivLiv: ${name} ${why}`) }
   const head = new DataView(await file.slice(0, 20).arrayBuffer())
   if (head.byteLength < 20 || head.getUint32(0, true) !== 0x46546c67) bad('is not a VRM: it should begin as a binary glTF does', 'not-a-model')
@@ -301,8 +334,7 @@ async function checkGlb(file: Blob, name: string, noDecoders: boolean) {
   if (head.getUint32(16, true) !== 0x4e4f534a) bad('is damaged (no JSON where a binary glTF has it)')
   if (jsonLen > VRM_LIMITS.json) bad(`is not one this player reads: its JSON has ${jsonLen} bytes, more than ${VRM_LIMITS.json}`, 'too-large')
   if (20 + jsonLen > file.size) bad('is damaged or cut short')
-  let gltf: { buffers?: { uri?: string }[]; images?: { uri?: string; bufferView?: number }[]; bufferViews?: { byteOffset?: number; byteLength?: number }[]
-    accessors?: { count?: number }[]; meshes?: { primitives?: { attributes?: { POSITION?: number } }[] }[]; extensionsUsed?: string[] }
+  let gltf: GlbJson
   try { gltf = JSON.parse(await file.slice(20, 20 + jsonLen).text()) } catch { return bad('is damaged (its JSON does not parse)') }
   for (const o of [...(gltf.buffers ?? []), ...(gltf.images ?? [])]) {
     if (o?.uri && !o.uri.startsWith('data:')) bad(`names a file outside itself (${String(o.uri).slice(0, 80)}), and a .vrm has to hold everything it needs`)
@@ -329,6 +361,7 @@ async function checkGlb(file: Blob, name: string, noDecoders: boolean) {
       bad(`has pictures too large for this player (${size[0]} x ${size[1]}; ${VRM_LIMITS.textureSide} px a side and ${VRM_LIMITS.texels} pixels in all at most)`, 'too-large')
     }
   }
+  return gltf && typeof gltf === 'object' ? gltf : {}
 }
 
 /** width and height from the start of a PNG or a JPEG (other kinds: unknown, left to the browser) */

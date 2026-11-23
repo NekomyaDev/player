@@ -1,4 +1,5 @@
-// The SDK as a library: ES modules, one file per entry (the core, and the optional tracking / voice / body / png / vrm),
+// The SDK as a library: ES modules, one file per entry (the core, and the optional tracking / voice / body / png / vrm, and
+// the advanced runtime),
 // shared code in chunks. The runtime is the site's own (../src/runtime): one source, built here, never copied. three
 // and three-vrm are the page's (optional peer dependencies), imported by vrm.js only.
 import { defineConfig } from 'vite'
@@ -10,7 +11,8 @@ export default defineConfig({
     target: 'es2022',
     minify: true,
     lib: {
-      entry: { index: 'src/index.ts', tracking: 'src/tracking.ts', voice: 'src/voice.ts', body: 'src/body.ts', png: 'src/png.ts', vrm: 'src/vrm.ts' },
+      entry: { index: 'src/index.ts', tracking: 'src/tracking.ts', voice: 'src/voice.ts', body: 'src/body.ts', png: 'src/png.ts', vrm: 'src/vrm.ts',
+        runtime: 'src/runtime.ts' },
       formats: ['es'],
     },
     rollupOptions: {

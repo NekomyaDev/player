@@ -6,7 +6,7 @@
   "generator": {
    "name": "livliv.ai"
   },
-  "created": "2026-11-06T07:25:08Z",
+  "created": "2026-11-23T05:57:10Z",
   "license": {
    "id": "LicenseRef-LivLiv-Samples",
    "url": "https://livliv.ai/licenses/samples",
@@ -36,11 +36,11 @@
   "bulge": 1,
   "hair": {
    "front": [
-    140,
-    11,
+    100,
+    8.5,
     0.022,
-    70,
-    7
+    55,
+    6
    ],
    "back": [
     48,
@@ -48,6 +48,13 @@
     0.06,
     24,
     3.5
+   ],
+   "side": [
+    140,
+    11,
+    0.022,
+    70,
+    7
    ]
   },
   "hair_limit": 0.25,
@@ -114,6 +121,11 @@
     "limit": 21.6,
     "sigma": 43.2
    }
+  ],
+  "hair_drive": [
+   1.6,
+   0,
+   0
   ]
  },
  "anchors": {
@@ -561,7 +573,9 @@
    "w": 400,
    "h": 39,
    "group": "hair_side",
-   "depth": 0.1
+   "depth": 0.18,
+   "fall": 0.45,
+   "fall_end": 0.95
   },
   {
    "id": "acc_0",
@@ -605,8 +619,9 @@
    "w": 326,
    "h": 344,
    "group": "hair_front",
-   "depth": 0.15,
-   "fall": 0.4
+   "depth": 0.18,
+   "fall": 0.45,
+   "fall_end": 0.95
   },
   {
    "id": "brows",

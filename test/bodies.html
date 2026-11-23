@@ -266,6 +266,21 @@
     return out
   }
 
+  /** VRMs as an exporter writes them (tiny-vrm.mjs's blender variants): for each, what it plays as (its name and licence)
+   *  and how much it covers, or what the player says instead */
+  window.runVrmTry = async (urls) => {
+    const out = {}
+    for (const [k, u] of Object.entries(urls)) {
+      const c = document.createElement('canvas')
+      c.style.cssText = 'width: 300px; height: 400px'
+      document.body.append(c)
+      const p = new BodyPlayer(c, new VrmBody(), { autoplay: false, idle: false, followPointer: false })
+      out[k] = await p.load(u).then((m) => { p.resize(); return { name: m.name, licence: m.meta?.license?.url ?? m.meta?.license?.id ?? null, share: covered(c) } }, (e) => ({ error: e.message, code: e.code }))
+      p.dispose(); c.remove()
+    }
+    return out
+  }
+
   /** how much of the canvas a VRM covers */
   window.runVrmShare = async (url) => {
     const c = document.createElement('canvas')

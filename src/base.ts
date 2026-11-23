@@ -8,12 +8,15 @@
 import { ActionPlayer, type ActionId as AnyAction } from './runtime/actions'
 import { uiLang } from './runtime/format'
 import { PARAM_RANGES, defaultParams, type Params } from './runtime/params'
+import type { Tuning } from './runtime/puppet'
+import { factor } from './feel'
 import { LivLivError } from './errors'
 import { Idle, type Seen } from './follow'
 import { releaseCanvas } from './release'
 import { TrackingFilter, type ParameterProfile, type ParameterSample } from './profile'
 
 export { LivLivError, type LivLivErrorCode } from './errors'
+export type { Tuning }
 
 /** a short move: see act() */
 export type ActionId = Exclude<AnyAction, 'away'>
@@ -106,6 +109,9 @@ export interface Host {
   use(driver: Driver): () => void
   /** blinks now (with the idle motion on) */
   blink(): void
+  /** the character's feel settings (see Tuning). Lip sync reads `mouth`, face tracking `mouth` and `expr`. A host of your
+   *  own may leave it out: everything at 1 */
+  readonly tuning?: Readonly<Tuning>
 }
 
 /** how far a load has come: the files coming in (0..1, in step order, 1 once they are all here; where the size is not
@@ -117,6 +123,11 @@ export interface LoadOptions {
    *  already aborted signal rejects at once and leaves a load that is running alone */
   signal?: AbortSignal
   onProgress?: (progress: LoadProgress) => void
+  /** the new character takes the motion over where the one before is, instead of starting at rest: for the same character
+   *  edited and loaded again (an editor's change), so its next frame goes on from its last. Its springs (hair, swinging
+   *  pieces), the body's lag behind the head, the long hair's swing and the expression showing go on; its own feel settings
+   *  are still the new file's. Default false: a new character starts at rest, as before */
+  continueMotion?: boolean
   /** the URL of a picture to show until the first frame (a character's cover.webp), as the canvas's CSS background: it
    *  fits the canvas's box, adds nothing to the page, and the canvas's own background comes back after. Only while the
    *  canvas shows nothing yet: over a character, that one stays until the next is ready */
@@ -171,6 +182,11 @@ function inRange(P: Params) {
   }
 }
 const finite = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
+/** every feel setting at its default: what a character that says nothing plays with
+ *  @internal */
+export const defaultFeel = (): Tuning => ({ turn: 1, nod: 1, hair: 1, blink: 1, expr: 1, mouth: 1, breath: 1, gaze: 1 })
+/** every feel setting's name (Tuning's keys) */
+const FEEL_KEYS: readonly string[] = ['turn', 'nod', 'hair', 'hairFront', 'hairBack', 'hairSway', 'hairRest', 'blink', 'expr', 'mouth', 'breath', 'gaze', 'fringe']
 const FITS: readonly Fit[] = ['frame', 'whole', 'knee']
 /** the deepest a recorded pose may crouch or dip a full-body character (a share of its frame's height): live ones reach
  *  about 0.07, and a whole frame's height would fold the legs past the feet */
@@ -206,12 +222,23 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
 
   /** @internal */
   protected info: Info | null = null
+  /** the feel settings it plays with now, live (a Player's are its puppet's)
+   *  @internal */
+  protected abstract get feel(): Tuning
+  /** the character's own feel settings, as it was loaded with them: what a setting set back to undefined returns to
+   *  @internal */
+  protected abstract get ownFeel(): Partial<Tuning>
+  /** how long the idle motion holds each blink shut (s): a Player's follows its puppet's blink hand-over; 0: as before
+   *  @internal */
+  protected get blinkHold() { return 0 }
   /** @internal */
   protected disposed = false
   private idler = new Idle()
   private parameterFilter = new TrackingFilter()
   /** last frame's: a face tracker drove it, the mouth moved (the idle starts no move while the character talks) */
   private was = { tracked: false, mouth: 0 }
+  /** frames were drawn with the idle motion off since it last ran: when it goes on, it eases in from them */
+  private idleGap = false
   /** @internal */
   protected actions = new ActionPlayer()
   private drivers: Driver[] = []
@@ -299,6 +326,50 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
 
   /** the loaded character (null before the first load) */
   get model(): Info | null { return this.info }
+
+  /** The character's feel settings as they play now, each a factor with 1 the default (see Tuning): a Player's come from
+   *  its model's `tuning`, and each load starts again from the new character's own. A frozen copy */
+  get tuning(): Readonly<Tuning> {
+    const f = this.feel
+    if (this.feelView?.of !== f) this.feelView = { of: f, view: Object.freeze({ ...f }) }
+    return this.feelView.view
+  }
+  /** the frozen copy `tuning` gives, until the settings change (setTuning) or are replaced (a load) */
+  private feelView: { of: Tuning; view: Readonly<Tuning> } | null = null
+
+  /** Changes some of the character's feel settings while it plays, without loading it again (an editor's sliders): each
+   *  a factor from 0 to 10, as in a model file (above 10 counts as 10); `undefined` or `null` puts one back to the
+   *  character's own. The next
+   *  frame shows them (on a paused player, call resize()). A name that is no setting, or a value that is no number from 0
+   *  up, throws a TypeError and changes nothing. A load starts again from the new character's own settings. On a
+   *  BodyPlayer, blink, expr and mouth count (the rest are kept, for tuning to read back) */
+  setTuning(changes: Partial<Record<keyof Tuning, number | null | undefined>>): void {
+    if (!changes || typeof changes !== 'object') throw new TypeError('LivLiv: setTuning takes an object of feel settings')
+    const entries = Object.entries(changes)
+    for (const [k, v] of entries) {
+      if (!FEEL_KEYS.includes(k)) throw new TypeError(`LivLiv: setTuning: "${k}" is not a feel setting (${FEEL_KEYS.join(', ')})`)
+      if (v != null && !(typeof v === 'number' && Number.isFinite(v) && v >= 0)) throw new TypeError(`LivLiv: setTuning: ${k} must be a number from 0 up, not ${String(v)}`)
+    }
+    const T = this.feel as unknown as Record<string, number | undefined>, own = this.ownFeel as Record<string, number | undefined>
+    const changed: string[] = [], blinkWas = factor(T.blink)
+    for (const [k, v] of entries) {
+      const before = T[k]
+      if (v != null) T[k] = Math.min(10, v)
+      else if (own[k] !== undefined) T[k] = own[k]
+      else if (k in defaultFeel()) T[k] = 1
+      else delete T[k]
+      if (!Object.is(before, T[k])) changed.push(k)
+    }
+    // the next blink comes as soon as the new rate has it: the wait left is scaled by the change (else a slower rate's long
+    // wait would hold a faster one back for seconds)
+    const lv = this.idler.lv, now = this.clock, rate = (b: number) => Math.max(0.2, b)
+    if (changed.includes('blink') && lv.blinkT < 0 && lv.nextBlink > now) lv.nextBlink = now + (lv.nextBlink - now) * rate(blinkWas) / rate(factor(T.blink))
+    if (changed.length) { this.feelView = null; this.retuned(changed) }
+  }
+
+  /** feel settings have changed (their names): what the subclass must do for them besides reading them each frame
+   *  @internal */
+  protected retuned(_keys: string[]) {}
   // the return type is the model's own expressions: without it the declaration emitter resolves Info['expressions']
   // to the constraint ({ id: string }[]) and consumers lose `label` / `labels`
   get expressions(): Info['expressions'] { return this.info?.expressions ?? [] as Info['expressions'] }
@@ -361,10 +432,13 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
     return run
   }
 
-  /** a new character starts on a neutral face
+  /** a new character starts on a neutral face; with `go` on (LoadOptions.continueMotion), it goes on with the expression
+   *  asked for (if it has it), the smile and the motion's smoothing
    *  @internal */
-  protected neutral() {
-    this.expr = {}; this.smile = 0; this.replaying = false; this.parameterFilter.reset()
+  protected neutral(go = false, has: (id: string) => boolean = () => false) {
+    this.replaying = false
+    if (go) { for (const k of Object.keys(this.expr)) if (!has(k)) delete this.expr[k]; return }
+    this.expr = {}; this.smile = 0; this.parameterFilter.reset()
     this.ground = { crouch: 0, dip: 0, talk: 0 }
   }
 
@@ -512,6 +586,14 @@ export abstract class PlayerBase<Info extends { expressions: { id: string }[] }>
     // the pose from scratch: your values, the idle motion, the drivers
     this.idler.shown(P)
     Object.assign(P, this.params)
+    this.idler.lv.blinkRate = factor(this.feel.blink)
+    this.idler.lv.blinkHold = this.blinkHold
+    if (this.idle && this.idleGap) {  // from the page's values, kept in range (a NaN would stay in the idle's springs)
+      const from = { ...P }
+      inRange(from)
+      this.idler.resume(from, t); this.idleGap = false
+    }
+    else if (!this.idle) this.idleGap = true
     if (this.idle) {
       this.idler.apply(P, t, dt, { busy: A.busy || this.was.mouth > 0.05, tracked: this.was.tracked,
         faceFree: !this.smile && !Object.values(E).some((v) => v > 0.02) })

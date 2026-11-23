@@ -9,7 +9,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { crc32, deflateRawSync } from 'node:zlib'
 
-const root = fileURLToPath(new URL('../characters/', import.meta.url))
+// (another folder of characters as the argument: the Pages workflow packs the retired ones this way)
+const root = process.argv[2] ? path.resolve(process.argv[2]) : fileURLToPath(new URL('../characters/', import.meta.url))
 
 function zip(dir) {
   const list = (at = '') => fs.readdirSync(path.join(dir, at), { withFileTypes: true }).flatMap((e) => {

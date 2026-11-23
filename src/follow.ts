@@ -10,6 +10,8 @@ import type { Puppet } from './runtime/puppet'
 export const IDLE_KEYS = ['angleX', 'angleY', 'angleZ', 'eyeLOpen', 'eyeROpen', 'eyeBallX', 'eyeBallY', 'browLY', 'browRY', 'bodyX', 'bodyZ', 'breath'] as const
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
+/** seconds the idle motion takes to ease in from the pose it took over from (resume) */
+const RESUME = 0.4
 
 /** what pointAt reads of a puppet: where the head is drawn (a BodyPlayer passes its body's head in canvas shares) */
 export type Seen = Pick<Puppet, 'model' | 'lastView'>
@@ -21,6 +23,8 @@ export class Idle {
   private turn = { x: 0, y: 0 }
   /** lookAt's target holds the attention: the pointer is not followed meanwhile */
   private held = false
+  /** the idle motion went on again (resume): the pose it took over from, and when */
+  private resumed: { from: Params; t: number } | null = null
 
   constructor() {
     if (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches) this.lv.moves = 0
@@ -32,8 +36,19 @@ export class Idle {
     lv.busy = now.busy; lv.tracked = now.tracked; lv.faceFree = now.faceFree
     lv.look = this.turn
     lv.apply(this.P, t, dt)
-    for (const k of IDLE_KEYS) P[k] = this.P[k]
+    const r = this.resumed, x = r ? Math.min(1, Math.max(0, (t - r.t) / RESUME)) : 1, w = x * x * (3 - 2 * x)
+    if (r && w >= 1) this.resumed = null
+    for (const k of IDLE_KEYS) P[k] = r && w < 1 ? r.from[k] + (this.P[k] - r.from[k]) * w : this.P[k]
     P.smile = Math.max(P.smile, this.P.smile)
+  }
+
+  /** The idle motion goes on again after frames drawn without it: from `from` (the pose those frames showed for the keys it
+   *  sets: the player's own values), its springs at rest there, easing into its own motion over RESUME seconds, instead of
+   *  jumping in one frame to where it stopped (and its eyes and breath to wherever they were) */
+  resume(from: Params, t: number) {
+    this.lv.startFrom(from)
+    for (const k of ['eyeBallX', 'eyeBallY', 'browLY', 'browRY'] as const) this.P[k] = from[k]
+    this.resumed = { from: { ...from }, t }
   }
 
   /** after the frame: the head as shown, everything over the idle included (the body follows it) */

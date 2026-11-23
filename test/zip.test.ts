@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { deflateRawSync } from 'node:zlib'
 import { ZIP_LIMITS, isZip, unzip } from '../src/zip.ts'
+import { modelFiles } from '../src/files.ts'
 
 interface Entry { name: string; data: Uint8Array; method?: 0 | 8; flags?: number; usize?: number }
 
@@ -98,4 +99,14 @@ test('Finder\'s compress (ditto): the folder inside, __MACOSX beside it', { skip
   const files = await unzip(new Blob([readFileSync(join(d, 'Sena.zip'))]))
   assert.deepEqual([...files.keys()].sort(), ['Sena/model.json', 'Sena/textures/body.webp'])
   assert.equal(await text(files.get('Sena/model.json')), '{"format":"livliv-model","version":4}')
+})
+
+test('a package naming a file with ":" or a control character: opened, as load() opens it; refused by modelFiles()', async () => {
+  for (const name of ['textures/a.webp:stream', 'textures/a\u0001.webp']) {
+    const z = zip([{ name: 'model.json', data: bytes('{}') }, { name, data: bytes('x') }])
+    assert.deepEqual([...(await unzip(z)).keys()], ['model.json', name])
+    await assert.rejects(modelFiles(z), { name: 'LivLivError', code: 'invalid', message: /cannot safely have/ })
+  }
+  const fine = zip([{ name: 'model.json', data: bytes('{}') }, { name: 'textures/a#1?.webp', data: bytes('x') }])
+  assert.deepEqual([...(await modelFiles(fine)).keys()], ['model.json', 'textures/a#1?.webp'])
 })

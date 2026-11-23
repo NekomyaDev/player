@@ -22,7 +22,7 @@ avatar.webp, thumb.jpg, poster.jpg, preview.webp, variants/*.jpg   previews, not
 | `keyforms: "keyforms.json"` | `files.keyforms` |
 | no `meta`, `files` or `requires` | |
 | `profile: {id, label, class: {…}}`; players read `class.input.facing` and `class.input.glasses` | `profile: {id, facing, glasses}` |
-| `tuning.hairFront`, `tuning.hairBack` | `tuning.hair_front`, `tuning.hair_back` |
+| `tuning.hairFront`, `tuning.hairBack`, `tuning.hairSway`, `tuning.hairRest` | `tuning.hair_front`, `tuning.hair_back`, `tuning.hair_sway`, `tuning.hair_rest` |
 | `expressions[]: {id, label, key, …}`: `label` one string; ids such as `x_expr_03637e` (a hash of the label) | `{id, label: {lang: name}, hotkey}`, standard ids |
 | a layer's `texture`, `frames`, `mask`, `talk`, `brow_tex` end in `.png`; `webp: true` means "load the `.webp` beside it" | the real path |
 | a layer's `name` (Japanese and English, as in a Live2D PSD) | optional `label` |

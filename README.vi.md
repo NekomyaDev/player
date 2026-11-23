@@ -7,7 +7,7 @@
 
 <p align="center">
   Trình phát nhân vật 2.5D nhẹ cho web, có đồng bộ môi (lip sync) và theo dõi khuôn mặt qua webcam. Chỉ vài dòng code là đưa được nhân vật vào trang web, lớp phủ stream hay ứng dụng.<br>
-  Đi kèm 25 nhân vật nổi bật với nhiều phong cách khác nhau, sẵn sàng dùng ngay.
+  Đi kèm 23 nhân vật nổi bật với nhiều phong cách khác nhau, sẵn sàng dùng ngay.
 </p>
 
 <p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a> · <b>Tiếng Việt</b></p>
@@ -18,7 +18,7 @@
 - Đồng bộ môi (microphone, audio, video) và theo dõi khuôn mặt qua webcam (MediaPipe), đều chạy trong trình duyệt, chỉ được tải khi bạn cần
 - Phát nhân vật LivLiv, VRM và PNGTuber qua cùng một API
 - Nhân vật toàn thân đứng trên mặt đất: lắc lư, khuỵu gối và nhún phần thân trên khi nói mà chân vẫn giữ nguyên, với khung hình bạn chọn
-- 25 nhân vật nổi bật trong [`characters/`](characters/), sẵn sàng dùng
+- 23 nhân vật nổi bật trong [`characters/`](characters/), sẵn sàng dùng
 
 ## Thử ngay
 
@@ -80,17 +80,27 @@ const png = new BodyPlayer(canvasB, new PngBody())
 await png.load({ closed: 'me-closed.png', open: 'me-open.png' })
 ```
 
-Toàn bộ API có trong [API.md](API.md) (tiếng Anh): các tùy chọn, tham số, biểu cảm và hành động, driver, tư thế đã ghi và điểm gắn, nhân vật VRM và PNGTuber,
+Toàn bộ API có trong [API.md](API.md) (tiếng Anh): các tùy chọn, tham số, biểu cảm và hành động, cài đặt cảm giác chuyển động, driver, tư thế đã ghi và điểm gắn, nhân vật VRM và PNGTuber,
 giới hạn khi đọc file không đáng tin cậy, gói model và phiên bản định dạng. Định dạng gói LivLiv (`.livliv`,
 `model.json` v4) có trong [FORMAT.md](FORMAT.md), kèm JSON Schema trong [`schema/`](schema/); các gói xuất trước v4
 được mô tả trong [FORMAT-v3.md](FORMAT-v3.md) và vẫn phát được.
+
+**Mới trong 0.6:** tóc dài phía dưới vai đung đưa sang hai bên khi đầu và thân chuyển động (`tuning.hair_sway` của mô
+hình quyết định biên độ, 0 là tắt), còn tóc dài xõa trên người thì đi theo thân chứ không theo đầu
+(`tuning.hair_rest`); khi chớp mắt, mống mắt cũng không còn hiện mờ trong suốt ở giữa chừng. Các cài đặt cảm giác
+chuyển động của nhân vật (`tuning`: mức quay đầu, độ đung đưa của tóc, tần suất chớp mắt…) có thể đọc qua
+`player.tuning` và thay đổi ngay khi đang phát bằng `player.setTuning()`, phù hợp cho thanh trượt của trình chỉnh sửa;
+`load(source, { continueMotion: true })` giữ cho nhân vật tiếp tục chuyển động khi được tải lại sau mỗi lần chỉnh sửa.
+Tệp VRM xuất từ Blender giờ đã phát được. Mã tự chạy vòng lặp khung hình có thể lấy trực tiếp trình kết xuất từ lối
+vào nâng cao `@livliv-dev/player/runtime`. Trang viết cho 0.5 không cần sửa gì. Xem [Feel
+settings](API.md#feel-settings-tuning-and-settuning) trong API.md.
 
 > Gói npm chỉ có trình phát. Các nhân vật nổi bật nằm trong [`characters/`](characters/) của repository này: hãy sao chép
 > những nhân vật bạn dùng, kèm giấy phép, vào cạnh trang của bạn.
 
 ## Nhân vật nổi bật
 
-`characters/` có 25 nhân vật, sẵn sàng để `load()`. Hầu hết do LivLiv tạo ra: bạn được dùng miễn phí kèm ghi công ("Characters: LivLiv (livliv.ai)"), cá nhân cũng được dùng thương mại; không được bán chính các nhân vật hay hàng hóa làm từ chúng, và không được dùng chúng để huấn luyện mô hình AI. Các nhân vật này **không** thuộc phạm vi Giấy phép Apache; điều khoản có trong [characters/LICENSE.md](characters/LICENSE.md). Kujira, Kujira Q và Pen dựa trên tác phẩm của người khác, với điều khoản riêng trong [characters/CREDITS.md](characters/CREDITS.md).
+`characters/` có 23 nhân vật, sẵn sàng để `load()`. Hầu hết do LivLiv tạo ra: bạn được dùng miễn phí kèm ghi công ("Characters: LivLiv (livliv.ai)"), cá nhân cũng được dùng thương mại; không được bán chính các nhân vật hay hàng hóa làm từ chúng, và không được dùng chúng để huấn luyện mô hình AI. Các nhân vật này **không** thuộc phạm vi Giấy phép Apache; điều khoản có trong [characters/LICENSE.md](characters/LICENSE.md). Kujira, Kujira Q và Pen dựa trên tác phẩm của người khác, với điều khoản riêng trong [characters/CREDITS.md](characters/CREDITS.md).
 
 **Mới trong 0.5.0: nhân vật toàn thân.** Được vẽ từ đầu đến chân và đứng trên mặt đất, nhân vật lắc lư, khuỵu gối và nhún phần thân trên khi nói mà chân vẫn giữ nguyên. Bốn nhân vật nổi bật là nhân vật toàn thân: Tsubaki, Neve, Juno và Viola (f05–f08). Chọn khung hình bằng `player.view.fit`: `'frame'` (mặc định), `'knee'` hoặc `'whole'`; xem [Full-body characters](API.md#full-body-characters) trong API.md.
 
@@ -102,15 +112,14 @@ Mỗi nhân vật còn là một file để tải về, `<id>.livliv`, tại `ht
 
 | id | tên | id | tên | id | tên |
 |---|---|---|---|---|---|
-| `k01` | [Sena](https://livliv-dev.github.io/player/characters/k01.livliv) | `d01` | [Yui](https://livliv-dev.github.io/player/characters/d01.livliv) | `v01` | [Aster](https://livliv-dev.github.io/player/characters/v01.livliv) |
-| `k02` | [Elio](https://livliv-dev.github.io/player/characters/k02.livliv) | `d02` | [Leo](https://livliv-dev.github.io/player/characters/d02.livliv) | `v03` | [Mira](https://livliv-dev.github.io/player/characters/v03.livliv) |
-| `char06` | [Aoi](https://livliv-dev.github.io/player/characters/char06.livliv) | `d03` | [Nana](https://livliv-dev.github.io/player/characters/d03.livliv) | `v04` | [Kai](https://livliv-dev.github.io/player/characters/v04.livliv) |
-| `char07` | [Sora](https://livliv-dev.github.io/player/characters/char07.livliv) | `d03ft` | [Nana (bản tinh chỉnh)](https://livliv-dev.github.io/player/characters/d03ft.livliv) | `v05` | [Lilith](https://livliv-dev.github.io/player/characters/v05.livliv) |
-| `s01` | [Hana](https://livliv-dev.github.io/player/characters/s01.livliv) | `p01` | [Kujira](https://livliv-dev.github.io/player/characters/p01.livliv) | `v06` | [Usa](https://livliv-dev.github.io/player/characters/v06.livliv) |
-| `q02` | [Mochi](https://livliv-dev.github.io/player/characters/q02.livliv) | `p02` | [Kujira Q](https://livliv-dev.github.io/player/characters/p02.livliv) | `v07` | [Stella](https://livliv-dev.github.io/player/characters/v07.livliv) |
-| `q03` | [Kotaro](https://livliv-dev.github.io/player/characters/q03.livliv) | `p03` | [Pen](https://livliv-dev.github.io/player/characters/p03.livliv) | `w01` | [Max](https://livliv-dev.github.io/player/characters/w01.livliv) |
-| `f05` | [Tsubaki (toàn thân)](https://livliv-dev.github.io/player/characters/f05.livliv) | `f06` | [Neve (toàn thân)](https://livliv-dev.github.io/player/characters/f06.livliv) | `f07` | [Juno (toàn thân)](https://livliv-dev.github.io/player/characters/f07.livliv) |
-| `f08` | [Viola (toàn thân)](https://livliv-dev.github.io/player/characters/f08.livliv) | | | | |
+| `k01` | [Sena](https://livliv-dev.github.io/player/characters/k01.livliv) | `k02` | [Elio](https://livliv-dev.github.io/player/characters/k02.livliv) | `char06` | [Aoi](https://livliv-dev.github.io/player/characters/char06.livliv) |
+| `char07` | [Sora](https://livliv-dev.github.io/player/characters/char07.livliv) | `s01` | [Hana](https://livliv-dev.github.io/player/characters/s01.livliv) | `d01` | [Yui](https://livliv-dev.github.io/player/characters/d01.livliv) |
+| `d02` | [Leo](https://livliv-dev.github.io/player/characters/d02.livliv) | `d03` | [Nana](https://livliv-dev.github.io/player/characters/d03.livliv) | `d03ft` | [Nana (bản tinh chỉnh)](https://livliv-dev.github.io/player/characters/d03ft.livliv) |
+| `v01` | [Aster](https://livliv-dev.github.io/player/characters/v01.livliv) | `v03` | [Mira](https://livliv-dev.github.io/player/characters/v03.livliv) | `v04` | [Kai](https://livliv-dev.github.io/player/characters/v04.livliv) |
+| `v05` | [Lilith](https://livliv-dev.github.io/player/characters/v05.livliv) | `v06` | [Usa](https://livliv-dev.github.io/player/characters/v06.livliv) | `v07` | [Stella](https://livliv-dev.github.io/player/characters/v07.livliv) |
+| `w01` | [Max](https://livliv-dev.github.io/player/characters/w01.livliv) | `p01` | [Kujira](https://livliv-dev.github.io/player/characters/p01.livliv) | `p02` | [Kujira Q](https://livliv-dev.github.io/player/characters/p02.livliv) |
+| `p03` | [Pen](https://livliv-dev.github.io/player/characters/p03.livliv) | `f05` | [Tsubaki (toàn thân)](https://livliv-dev.github.io/player/characters/f05.livliv) | `f06` | [Neve (toàn thân)](https://livliv-dev.github.io/player/characters/f06.livliv) |
+| `f07` | [Juno (toàn thân)](https://livliv-dev.github.io/player/characters/f07.livliv) | `f08` | [Viola (toàn thân)](https://livliv-dev.github.io/player/characters/f08.livliv) | | |
 
 ## Nhân vật của riêng bạn
 

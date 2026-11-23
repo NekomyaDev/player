@@ -7,7 +7,7 @@
 
 <p align="center">
   A lightweight 2.5D character player for the web, with lip sync and webcam face tracking. A few lines of code put a character in a page, a stream overlay or an app.<br>
-  Comes with 25 featured characters in different styles, ready to use.
+  Comes with 23 featured characters in different styles, ready to use.
 </p>
 
 <p align="center"><b>English</b> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.vi.md">Tiếng Việt</a></p>
@@ -18,7 +18,7 @@
 - Lip sync (microphone, audio, video) and webcam face tracking (MediaPipe), both in the browser, imported only when you need them
 - Plays LivLiv, VRM and PNGTuber characters through the same API
 - Full-body characters stand on the ground: they sway, crouch and dip with their feet in place, in the shot you pick
-- 25 featured characters in [`characters/`](characters/), ready to use
+- 23 featured characters in [`characters/`](characters/), ready to use
 
 ## Try it
 
@@ -80,17 +80,26 @@ const png = new BodyPlayer(canvasB, new PngBody())
 await png.load({ closed: 'me-closed.png', open: 'me-open.png' })
 ```
 
-The whole API is in [API.md](API.md): options, params, expressions and actions, drivers, recorded poses and attachment
+The whole API is in [API.md](API.md): options, params, expressions and actions, feel settings, drivers, recorded poses and attachment
 points, VRM and PNGTuber characters, the limits on untrusted files, the model package and the format version. The LivLiv package format (`.livliv`,
 `model.json` v4) is in [FORMAT.md](FORMAT.md), with a JSON Schema in [`schema/`](schema/); packages exported before v4
 are described in [FORMAT-v3.md](FORMAT-v3.md) and still play.
+
+**New in 0.6:** long hair swings below the shoulders as the head and body move (a model's `tuning.hair_sway` sets how
+far; 0 turns it off), and long hair lying on the body goes with the body, not the head (`tuning.hair_rest`). Blinks no
+longer show a see-through iris halfway. A character's feel settings (`tuning`: how far it turns, how freely its hair
+swings, how often it blinks …) can be read with `player.tuning` and changed while it plays with `player.setTuning()`,
+for an editor's sliders, and `load(source, { continueMotion: true })` keeps a character moving when an edit loads it
+again. VRM files exported from Blender play. Code that runs its own frame loop can take the renderer itself from an
+advanced entry, `@livliv-dev/player/runtime`. Pages written for 0.5 need no change. See [Feel
+settings](API.md#feel-settings-tuning-and-settuning) in API.md.
 
 > The npm package is the player alone. The featured characters are in this repository's [`characters/`](characters/): copy
 > the ones you use next to your page, with their licence.
 
 ## Featured characters
 
-`characters/` holds 25 characters, ready to `load()`. Most were made by LivLiv: use them free with credit
+`characters/` holds 23 characters, ready to `load()`. Most were made by LivLiv: use them free with credit
 ("Characters: LivLiv (livliv.ai)"), commercially too if you are an individual. Don't sell them or merchandise made from
 them, and don't train AI models on them. They are **not** covered by the Apache License; the terms are in
 [characters/LICENSE.md](characters/LICENSE.md). Kujira, Kujira Q and Pen come from other people's work, with their own
@@ -110,15 +119,14 @@ there, and [`index.json`](https://livliv-dev.github.io/player/characters/index.j
 
 | id | name | id | name | id | name |
 |---|---|---|---|---|---|
-| `k01` | [Sena](https://livliv-dev.github.io/player/characters/k01.livliv) | `d01` | [Yui](https://livliv-dev.github.io/player/characters/d01.livliv) | `v01` | [Aster](https://livliv-dev.github.io/player/characters/v01.livliv) |
-| `k02` | [Elio](https://livliv-dev.github.io/player/characters/k02.livliv) | `d02` | [Leo](https://livliv-dev.github.io/player/characters/d02.livliv) | `v03` | [Mira](https://livliv-dev.github.io/player/characters/v03.livliv) |
-| `char06` | [Aoi](https://livliv-dev.github.io/player/characters/char06.livliv) | `d03` | [Nana](https://livliv-dev.github.io/player/characters/d03.livliv) | `v04` | [Kai](https://livliv-dev.github.io/player/characters/v04.livliv) |
-| `char07` | [Sora](https://livliv-dev.github.io/player/characters/char07.livliv) | `d03ft` | [Nana (refined)](https://livliv-dev.github.io/player/characters/d03ft.livliv) | `v05` | [Lilith](https://livliv-dev.github.io/player/characters/v05.livliv) |
-| `s01` | [Hana](https://livliv-dev.github.io/player/characters/s01.livliv) | `p01` | [Kujira](https://livliv-dev.github.io/player/characters/p01.livliv) | `v06` | [Usa](https://livliv-dev.github.io/player/characters/v06.livliv) |
-| `q02` | [Mochi](https://livliv-dev.github.io/player/characters/q02.livliv) | `p02` | [Kujira Q](https://livliv-dev.github.io/player/characters/p02.livliv) | `v07` | [Stella](https://livliv-dev.github.io/player/characters/v07.livliv) |
-| `q03` | [Kotaro](https://livliv-dev.github.io/player/characters/q03.livliv) | `p03` | [Pen](https://livliv-dev.github.io/player/characters/p03.livliv) | `w01` | [Max](https://livliv-dev.github.io/player/characters/w01.livliv) |
-| `f05` | [Tsubaki (full-body)](https://livliv-dev.github.io/player/characters/f05.livliv) | `f06` | [Neve (full-body)](https://livliv-dev.github.io/player/characters/f06.livliv) | `f07` | [Juno (full-body)](https://livliv-dev.github.io/player/characters/f07.livliv) |
-| `f08` | [Viola (full-body)](https://livliv-dev.github.io/player/characters/f08.livliv) | | | | |
+| `k01` | [Sena](https://livliv-dev.github.io/player/characters/k01.livliv) | `k02` | [Elio](https://livliv-dev.github.io/player/characters/k02.livliv) | `char06` | [Aoi](https://livliv-dev.github.io/player/characters/char06.livliv) |
+| `char07` | [Sora](https://livliv-dev.github.io/player/characters/char07.livliv) | `s01` | [Hana](https://livliv-dev.github.io/player/characters/s01.livliv) | `d01` | [Yui](https://livliv-dev.github.io/player/characters/d01.livliv) |
+| `d02` | [Leo](https://livliv-dev.github.io/player/characters/d02.livliv) | `d03` | [Nana](https://livliv-dev.github.io/player/characters/d03.livliv) | `d03ft` | [Nana (refined)](https://livliv-dev.github.io/player/characters/d03ft.livliv) |
+| `v01` | [Aster](https://livliv-dev.github.io/player/characters/v01.livliv) | `v03` | [Mira](https://livliv-dev.github.io/player/characters/v03.livliv) | `v04` | [Kai](https://livliv-dev.github.io/player/characters/v04.livliv) |
+| `v05` | [Lilith](https://livliv-dev.github.io/player/characters/v05.livliv) | `v06` | [Usa](https://livliv-dev.github.io/player/characters/v06.livliv) | `v07` | [Stella](https://livliv-dev.github.io/player/characters/v07.livliv) |
+| `w01` | [Max](https://livliv-dev.github.io/player/characters/w01.livliv) | `p01` | [Kujira](https://livliv-dev.github.io/player/characters/p01.livliv) | `p02` | [Kujira Q](https://livliv-dev.github.io/player/characters/p02.livliv) |
+| `p03` | [Pen](https://livliv-dev.github.io/player/characters/p03.livliv) | `f05` | [Tsubaki (full-body)](https://livliv-dev.github.io/player/characters/f05.livliv) | `f06` | [Neve (full-body)](https://livliv-dev.github.io/player/characters/f06.livliv) |
+| `f07` | [Juno (full-body)](https://livliv-dev.github.io/player/characters/f07.livliv) | `f08` | [Viola (full-body)](https://livliv-dev.github.io/player/characters/f08.livliv) | | |
 
 ## Characters of your own
 

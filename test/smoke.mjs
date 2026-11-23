@@ -235,6 +235,79 @@ try {
     console.log(`${wrong.length ? 'FAIL' : 'ok  '} a full-body character${wrong.length ? `: ${wrong.join(', ')}: ${JSON.stringify(r)}` : `: head ${r.shots.frame.head.toFixed(2)} / ${r.shots.knee.head.toFixed(2)} / ${r.shots.whole.head.toFixed(2)} of the width by shot, feet ${r.restFeet} px up at rest, ${r.crouchFeet} crouched, ${r.sunkFeet} asked to sink, ${r.liftFeet} lifted`}`)
   }
 
+  // the feel settings (see runTuning)
+  {
+    const r = await page.evaluate((id) => window.runTuning(id), ids.find((i) => i === 'k01') ?? ids[0])
+    const t = r.read
+    const ok = t.blink === 2.5 && t.expr === 0.5 && t.mouth === 1.5 && t.hairFront === 1.2 && t.turn === 1 && r.frozen && r.still === 0
+      && r.playing.blinkRate === 2.5 && r.playing.mouth === 1.5 && r.playing.expr === 0.5
+    if (!ok) failed++
+    console.log(`${ok ? 'ok  ' : 'FAIL'} the feel settings from model.json: ${JSON.stringify(t)}; blink, expr, mouth change ${(r.still * 100).toFixed(2)} % of a still frame and play as the file says (blink rate ${r.playing.blinkRate}, drivers read mouth ${r.playing.mouth}, expr ${r.playing.expr})`)
+    const kf = ids.find((id) => JSON.parse(readFileSync(join(chars, id, 'model.json'), 'utf8')).files?.keyforms)
+    const s = await page.evaluate(([a, b]) => window.runSetTuning(a, b), [ids.find((i) => i === 'k01') ?? ids[0], kf ?? ids[0]])
+    const zero = (xs) => xs.every((n) => n === 0), some = (xs) => xs.some((n) => n > 0)
+    const own = s.keyforms.tuning
+    const setOk = zero(s.plain.set) && some(s.plain.moved) && zero(s.keyforms.set) && some(s.keyforms.moved) && zero(s.keyforms.back)
+      && s.keyforms.keys[0] === s.keyforms.keys[1] && s.keyforms.keys[1] !== s.keyforms.keys[2] && own[0] === own[2] && own[1] === own[3]
+      && s.next.turn === 1 && s.next.mouth === 1
+    if (!setOk) failed++
+    console.log(`${setOk ? 'ok  ' : 'FAIL'} setTuning() draws as a load with the same settings: ${s.plain.set.join('/')} px differ (${s.plain.moved.join('/')} from the character's own); with keyforms (${kf}) ${s.keyforms.set.join('/')} px (keys ${s.keyforms.keys[1]}), set back ${s.keyforms.back.join('/')} px, a frame ${s.keyforms.ms[0]} ms, with the keys measured again ${s.keyforms.ms[1]} ms${setOk ? '' : `: ${JSON.stringify(s)}`}`)
+  }
+
+  // the advanced entry (see runRuntime)
+  {
+    const r = await page.evaluate((a) => window.runRuntime(a), ids.find((i) => i === 'k01') ?? ids[0])
+    const ok = !r.exports.length && r.brand === 'function' && r.same && r.warm.join() === 'true,false' && r.cases > 300 && !r.wrong.length
+      && /hair/.test(r.named) && r.meshes.n > 5 && r.meshes.tri && r.rgba?.length === 4 && r.rgba[3] > 128 && r.outside === null && r.drawSame === 0
+    if (!ok) failed++
+    console.log(`${ok ? 'ok  ' : 'FAIL'} @livliv-dev/player/runtime: the same renderer as Player's, warm-up ${r.warm.join('/')} (Player/runtime), layersAt() as livliv.ai's pickPosed at ${r.cases - r.wrong.length} of ${r.cases} points in 4 poses (${r.named}), ${r.meshes.n} meshes${ok ? '' : `: ${JSON.stringify({ ...r, wrong: r.wrong.slice(0, 5) })}`}`)
+  }
+
+  // loaded again while it moves (see runContinue): with continueMotion no jump, without it the motion starts at rest
+  for (const id of [ids.find((i) => i === 'k01') ?? ids[0], ids.find((i) => i === 'f05') ?? ids[0]]) {
+    const r = await page.evaluate((a) => window.runContinue(a), id)
+    const ok = r.go.step <= r.go.most && r.go.expr && r.rest.step > r.rest.most && !r.rest.expr
+    if (!ok) failed++
+    console.log(`${ok ? 'ok  ' : 'FAIL'} ${id} loaded again while it moves: continueMotion changes ${(r.go.step * 100).toFixed(1)} % of the frame (a frame's own motion up to ${(r.go.most * 100).toFixed(1)} %), the expression kept; at rest ${(r.rest.step * 100).toFixed(1)} %`)
+  }
+
+  // the long hair's setup for any face size (see runWideFace)
+  {
+    const r = await page.evaluate((a) => window.runWideFace(a), ids.find((i) => i === 'k01') ?? ids[0])
+    const ok = !r.wide.error && !r.plain.error && r.wide.ms < r.plain.ms + 1000
+    if (!ok) failed++
+    console.log(`${ok ? 'ok  ' : 'FAIL'} a face 1 000 000 px wide on 2048 x 2048 cells of hair loads in ${r.wide.ms} ms, the same model with its own face in ${r.plain.ms} ms${r.wide.error ?? ''}`)
+  }
+
+  // long hair's swing (see runSway), on a character with long hair
+  {
+    const id = ids.find((i) => i === 'f05') ?? ids[0]
+    const r = await page.evaluate((a) => window.runSway(a), id)
+    const ok = r.same.every((n) => n === 0) && r.swings.some((n) => n > 0)
+    if (!ok) failed++
+    console.log(`${ok ? 'ok  ' : 'FAIL'} long hair swings (${id}): ${r.swings.join('/')} px move with the swing; hair_sway 0 in the file and setTuning({ hairSway: 0 }) differ by ${r.same.join('/')} px`)
+  }
+
+  // long hair resting on the body (see runRest), on a character with long hair over its shoulders, and on one whose turns
+  // come from keyforms (measured with the setting on: setTuning has them measured again)
+  for (const id of new Set([ids.find((i) => i === 'k01') ?? ids[0], ids.find((i) => i === 'd03ft') ?? kfId])) {
+    const r = await page.evaluate((a) => window.runRest(a), id)
+    const ok = r.still.every((n) => n === 0) && r.same.every((n) => n === 0) && r.rests.some((n) => n > 0)
+    if (!ok) failed++
+    console.log(`${ok ? 'ok  ' : 'FAIL'} long hair rests on the body (${id}): ${r.rests.join('/')} px move with it; hair_rest 0 in the file and setTuning({ hairRest: 0 }) differ by ${r.same.join('/')} px; a still frame by ${r.still.join('/')} px`)
+  }
+
+  // the blink hand-over's switch on Player (see runBlinkSwitch)
+  {
+    const id = ids.find((i) => i === 'k01') ?? ids[0]
+    const b = await page.evaluate((a) => window.runBlinkSwitch(a), id)
+    const hold = b.default[2]
+    const ok = b.default[0] === true && b.default[1] === true && hold > 0 && b.off.join() === 'false,false,0' && b.kept === false
+      && b.on[0] === true && b.on[1] === true && b.on[2] === hold && b.slit > 0 && b.open === 0 && b.back === 0
+    if (!ok) failed++
+    console.log(`${ok ? 'ok  ' : 'FAIL'} player.blinkHandover (${id}): on by default (blink hold ${hold} s), off ${JSON.stringify(b.off)}, kept across a load (${b.kept}); off moves ${b.slit} px of nearly shut eyes and ${b.open} px of open ones; back on differs by ${b.back} px`)
+  }
+
   // a model that breaks while it is built (see runKeep): the character before stays, to the pixel
   const has = (test) => ids.find((id) => test(JSON.parse(readFileSync(join(chars, id, 'model.json'), 'utf8')), id))
   const rigged = has((m) => m.rig?.chains?.length && m.files?.keyforms) ?? kfId
@@ -354,6 +427,28 @@ try {
   const noOk = /no mesh/.test(no.noMesh) && /Draco/.test(no.draco) && /too large/.test(no.bigImage) && /outside itself/.test(no.outside) && outsideAsked === 0 && /not a VRM/.test(no.plainFile) && no.kept === 'Tiny'
   if (!noOk) failed++
   console.log(`${noOk ? 'ok  ' : 'FAIL'} VRM files refused, the character before kept (${no.kept}), outside requests ${outsideAsked}: ${[no.noMesh, no.draco, no.bigImage, no.outside, no.plainFile].map((m) => m.replace(/^LivLiv: \S+ /, '').slice(0, 34)).join(' | ')}`)
+
+  // as VRM Add-on for Blender writes them (issue #1): both specs play; a licence URL of the author's own and node
+  // constraints in a circle play too (0.5 refused both); what cannot play says why in the exporter's terms
+  {
+    const urls = { b1: tiny({ blender: true }), b0: tiny({ blender: true, spec: 0 }), licence: tiny({ blender: true, licenseUrl: 'https://example.com/terms' }),
+      circular: tiny({ blender: true, circular: true }), bones: tiny({ blender: true, missing: ['leftFoot'] }), meta: tiny({ blender: true, spec: 0, noMeta: true }),
+      spec: tiny({ blender: true, spec1: '1.1' }) }
+    const warned = []
+    const listen = (m) => { if (/node constraints/.test(m.text())) warned.push(m.text()) }
+    page.on('console', listen)
+    const r = await page.evaluate((u) => window.runVrmTry(u), urls)
+    page.off('console', listen)
+    const plays = (x) => x && !x.error && x.share > 0.02
+    const checks = {
+      'Blender 1.0': plays(r.b1), 'Blender 0.x': plays(r.b0), "the author's licence URL": plays(r.licence) && r.licence.licence === 'https://example.com/terms',
+      'constraints in a circle': plays(r.circular) && warned.length === 1, 'missing bones': /lacks humanoid bones .*leftFoot.*Humanoid panel/.test(r.bones.error),
+      'no meta': /without its meta.*Meta panel/.test(r.meta.error), 'another spec': /is VRM 1\.1, and this player reads VRM 1\.0 and 0\.x/.test(r.spec.error),
+    }
+    const wrong = Object.entries(checks).filter(([, ok]) => !ok).map(([k]) => k)
+    if (wrong.length) failed++
+    console.log(`${wrong.length ? 'FAIL' : 'ok  '} VRM as Blender exports it: ${Object.keys(checks).join(', ')}${wrong.length ? `: ${wrong.join(', ')} ${JSON.stringify(r)}` : ''}`)
+  }
 
   // in any units: a character 100 times too big, or a tenth of the size, still fills the frame
   for (const unit of [100, 0.1]) {
@@ -489,6 +584,44 @@ try {
     }
     await p.close()
   }
+  // the example pages say what went wrong on the page: a VRM on the LivLiv page (and where to open it instead), a VRM
+  // that cannot play on the VRM page (three.js and three-vrm served here in place of their CDN), a Blender VRM that
+  // plays there, an error nobody caught, a part of the page that did not load
+  {
+    const local = { 'https://cdn.jsdelivr.net/npm/three@0.186.0/': 'node_modules/three/', 'https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.5.5/': 'node_modules/@pixiv/three-vrm/' }
+    const page2 = async (path, cdn = true) => {
+      const p = await browser.newPage()
+      await p.route('https://cdn.jsdelivr.net/**', (route) => {
+        const u = route.request().url(), at = Object.keys(local).find((k) => u.startsWith(k))
+        if (!cdn || !at) return route.fulfill({ status: 404, body: '' })
+        const f = join(root, local[at], u.slice(at.length))
+        return existsSync(f) ? route.fulfill({ status: 200, contentType: 'text/javascript', body: readFileSync(f) }) : route.fulfill({ status: 404, body: '' })
+      })
+      await p.goto(`http://127.0.0.1:${server.address().port}/example/${path}`)
+      return p
+    }
+    const status = async (p, re) => p.waitForFunction((src) => new RegExp(src).test(document.getElementById('status').textContent), re.source, { timeout: 20000 })
+      .then(() => p.evaluate(() => document.getElementById('status').textContent), async () => `TIMEOUT: ${await p.evaluate(() => document.getElementById('status').textContent)}`)
+    const said = {}
+    let p = await page2(`demo.html?model=${encodeURIComponent(tiny({ blender: true }))}`)
+    said.vrmOnDemo = await status(p, /BodyPlayer/); said.link = await p.evaluate(() => !!document.querySelector('#status a[href="vrm.html"]'))
+    await p.evaluate(() => setTimeout(() => { throw new Error('a test error nobody caught') }))
+    said.uncaught = await status(p, /Something went wrong: a test error nobody caught/)
+    await p.close()
+    p = await page2(`vrm.html?model=${encodeURIComponent(tiny({ blender: true, missing: ['leftFoot'] }))}`)
+    said.bones = await status(p, /lacks humanoid bones/)
+    await p.close()
+    p = await page2(`vrm.html?model=${encodeURIComponent(tiny({ blender: true }))}`)
+    said.plays = await status(p, /vrm/)
+    await p.close()
+    p = await page2(`vrm.html?model=${encodeURIComponent(tiny({ blender: true }))}`, false)
+    said.noThree = await status(p, /could not load three|did not load/)
+    await p.close()
+    const ok = /use a BodyPlayer/.test(said.vrmOnDemo) && said.link && !/TIMEOUT/.test(said.uncaught) && /leftFoot/.test(said.bones) && !/TIMEOUT|Something/.test(said.plays) && !/TIMEOUT/.test(said.noThree)
+    if (!ok) failed++
+    console.log(`${ok ? 'ok  ' : 'FAIL'} the example pages say what went wrong: ${Object.entries(said).map(([k, v]) => `${k}: ${String(v).slice(0, 70)}`).join(' | ')}`)
+  }
+
   // ?model=: never a request to another site, however it is written; the page's own files still open
   for (const name of ['demo', 'vrm']) {
     const p = await browser.newPage(), asked = []

@@ -7,7 +7,7 @@
 
 <p align="center">
   超轻量的 2.5D 网页角色播放器，支持口型同步和摄像头面捕，几行代码就能接入网页、直播画面和应用。<br>
-  自带 25 个风格各异的精选角色，即开即用。
+  自带 23 个风格各异的精选角色，即开即用。
 </p>
 
 <p align="center"><a href="README.md">English</a> · <b>中文</b> · <a href="README.ja.md">日本語</a> · <a href="README.vi.md">Tiếng Việt</a></p>
@@ -20,7 +20,7 @@
 - 口型同步（麦克风、音频、视频）和摄像头面捕（MediaPipe），都在浏览器里运行，按需引入
 - 支持 LivLiv、VRM 和 PNGTuber 三种角色，用同一套接口
 - 全身角色双脚站在地面上：会晃、会蹲，说话时上身轻轻一沉，取景自己选
-- [`characters/`](characters/) 里有 25 个精选角色，可以直接用
+- [`characters/`](characters/) 里有 23 个精选角色，可以直接用
 
 ## 试一试
 
@@ -80,13 +80,15 @@ const png = new BodyPlayer(canvasB, new PngBody())
 await png.load({ closed: 'me-closed.png', open: 'me-open.png' })
 ```
 
-完整的 API 见 [API.md](API.md)（英文）：选项、参数、表情和动作、驱动、录下的姿态和挂点、VRM 和 PNGTuber、不可信文件的上限、模型包和格式版本。LivLiv 模型包格式（`.livliv`、`model.json` v4）见 [FORMAT.md](FORMAT.md)，JSON Schema 在 [`schema/`](schema/)；v4 之前导出的模型包见 [FORMAT-v3.md](FORMAT-v3.md)，照样能播放。
+完整的 API 见 [API.md](API.md)（英文）：选项、参数、表情和动作、手感设置、驱动、录下的姿态和挂点、VRM 和 PNGTuber、不可信文件的上限、模型包和格式版本。LivLiv 模型包格式（`.livliv`、`model.json` v4）见 [FORMAT.md](FORMAT.md)，JSON Schema 在 [`schema/`](schema/)；v4 之前导出的模型包见 [FORMAT-v3.md](FORMAT-v3.md)，照样能播放。
+
+**0.6 新增：** 头和身体动起来时，肩膀以下的长发会左右摆动（模型的 `tuning.hair_sway` 控制幅度，设为 0 即关闭），搭在身体上的长发跟着身体走，不再整片跟着头（`tuning.hair_rest`）；眨眼到一半时也不再露出半透明的眼珠。角色的手感设置（`tuning`：转头幅度、头发晃动、眨眼频率等）可以用 `player.tuning` 读取，用 `player.setTuning()` 在播放中直接修改，适合编辑器的滑块；`load(source, { continueMotion: true })` 让编辑后重新加载的角色接着原来的动作继续动。Blender 导出的 VRM 文件也能播放了。自己跑帧循环的代码可以从高级入口 `@livliv-dev/player/runtime` 直接拿到渲染器。为 0.5 写的页面无需改动。详见 API.md 的 [Feel settings](API.md#feel-settings-tuning-and-settuning)。
 
 > npm 包里只有播放器。精选角色在这个仓库的 [`characters/`](characters/) 里，把要用的角色连同许可一起复制到你的页面旁边。
 
 ## 精选角色
 
-`characters/` 里有 25 个角色，可以直接 `load()`。大部分由 LivLiv 制作：署名（「角色：LivLiv（livliv.ai）」）就能免费使用，个人也可以商用；不能出售角色本身或做成周边出售，不能用来训练 AI 模型。它们**不**适用 Apache 许可，完整条款见 [characters/LICENSE.md](characters/LICENSE.md)。Kujira、Kujira Q 和 Pen 来自别人的作品，条款见 [characters/CREDITS.md](characters/CREDITS.md)。
+`characters/` 里有 23 个角色，可以直接 `load()`。大部分由 LivLiv 制作：署名（「角色：LivLiv（livliv.ai）」）就能免费使用，个人也可以商用；不能出售角色本身或做成周边出售，不能用来训练 AI 模型。它们**不**适用 Apache 许可，完整条款见 [characters/LICENSE.md](characters/LICENSE.md)。Kujira、Kujira Q 和 Pen 来自别人的作品，条款见 [characters/CREDITS.md](characters/CREDITS.md)。
 
 **0.5.0 新增全身角色。** 全身角色从头画到脚，双脚站在地面上：会晃、会蹲，说话时上身轻轻一沉，脚不离地。精选角色里有 4 个全身角色：Tsubaki、Neve、Juno、Viola（f05–f08）。用 `player.view.fit` 选取景：`'frame'`（默认）、`'knee'` 或 `'whole'`，详见 API.md 的 [Full-body characters](API.md#full-body-characters)。
 

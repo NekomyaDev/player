@@ -7,7 +7,7 @@ that [livliv.ai](https://livliv.ai) exports and that LivLiv Player (`@livliv-dev
 - JSON Schema: [`schema/livliv-model-v4.json`](schema/livliv-model-v4.json) (`model.json`) and
   [`schema/livliv-keyforms-v1.json`](schema/livliv-keyforms-v1.json) (`keyforms.json`)
 - The format before this one: [FORMAT-v3.md](FORMAT-v3.md). Players read it forever.
-- Status: 4.0, November 2026.
+- Status: 4.2.
 
 The key words MUST, SHOULD and MAY are used as in RFC 2119.
 
@@ -128,7 +128,19 @@ Paths are relative to `model.json`, use `/`, and contain no `..`, scheme or driv
 - `facing` (`front`, `three_quarter`, `side`, `back`) and `glasses`: how the face was drawn. The reference player
   only curves the closing eyelid along the drawn lash line on front-facing faces without glasses. Missing: unknown.
 
-`tuning`: `turn nod hair hair_front hair_back blink expr mouth breath`, each a factor (1 = default, 0–10).
+`tuning`: the owner's feel settings, each a factor (1 = default, 0–10). A reader treats a missing one as 1.
+
+| field | |
+|---|---|
+| `turn`, `nod` | how far the head turns and tilts (and the body with it), and how far it nods on top of that |
+| `hair`, `hair_front`, `hair_back` | how freely the hair swings; `hair_front` (the bangs) and `hair_back` (long hair and the swinging pieces) each take the place of `hair` where set |
+| `hair_sway` (4.2) | how far long hair swings sideways below the shoulders as the head and body move, times `hair_back` (or `hair`); 0 turns it off |
+| `hair_rest` (4.2) | how much long hair lying on the body below the neck goes with the body instead of the head: the share of the head's motion it gives up there, 0..1 (more counts as 1); 0 turns it off, a missing one is 1, not the usual default of the others |
+| `breath` | breathing |
+| `blink` | how often the idle motion blinks |
+| `expr`, `mouth` | how readily face tracking reads a smile; how far face tracking and live lip sync open the mouth |
+| `gaze` (4.2) | the share of the iris's travel the eyes use; 1 and above is all of it |
+| `fringe` (4.2) | how far the bangs stand off the face: the depth of each `hair_front` layer times this (0 lies on the face). A reader draws a layer of depth `d` at most `max(d, 0.3)` deep |
 
 `anchors` (all in canvas pixels):
 
@@ -267,6 +279,8 @@ Changes:
 - **4.1** (November 2026): full-body characters: `anchors.frame`, `anchors.body`, `anchors.hair_bottom_y`, the feature
   `full_body` (§5); `rig.lattice` (Appendix C). LivLiv Player reads them from 0.5; 0.4 and earlier refuse a model that
   lists the feature.
+- **4.2**: optional `tuning.gaze` and `tuning.fringe` (§5), which LivLiv Player 0.5 already read, and
+  `tuning.hair_sway` and `tuning.hair_rest` (from Player 0.6). A reader without them plays the defaults.
 
 ## Appendix A: standard expression ids (4.0)
 

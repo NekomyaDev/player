@@ -22,6 +22,7 @@
 // read as the whole picture tilting). The 'turn' style is the follow of before (the head up to
 // ~25-30 degrees, the eyes all the way); the idle under the webcam keeps it, so the params while tracking are exactly
 // what they were
+import { blinkOpen, blinkOver } from './params'
 import type { Params, Puppet } from './puppet'
 
 const smoothstep = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t) }
@@ -153,6 +154,8 @@ export function pointAt(lv: LivelyIdle, p: Puppet, x: number, y: number, w: numb
 export class LivelyIdle {
   nextBlink = 2; blinkT = -1; blinkAt = -99; look = { x: 0, y: 0 }
   blinkRate = 1
+  /** how long each blink holds the eyes shut (s): BLINK_HOLD goes with Puppet.blinkHandover; 0: as before */
+  blinkHold = 0
   nextSaccade = 1; gaze = { x: 0, y: 0 }
   /** set by the caller while the character talks or plays an action: no idle move starts then, and one playing fades */
   busy = false
@@ -189,6 +192,19 @@ export class LivelyIdle {
   private breathPeriod = 3.8
   private double = false
   private seed = Math.random() * 100
+
+  /** the springs at rest at a pose's head and body (P's), the body's follow of the head let go: an idle motion that was
+   *  off goes on from that pose rather than from where it stopped */
+  startFrom(P: Params) {
+    for (const k of Object.keys(SPRING) as (keyof typeof SPRING)[]) { this.s[k].x = P[k]; this.s[k].v = 0 }
+    this.aim = null
+    this.fol = { x: 0, z: 0, x2: 0, z2: 0 }
+    // the breath goes on from the pose's, breathing in
+    const b = clamp(P.breath, 0, 1)
+    let lo = 0, hi = 1
+    for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (smoothstep(0, 1, m) < b) lo = m; else hi = m }
+    this.breathPhase = 0.4 * lo
+  }
 
   private breath(dt: number) {
     this.breathPhase += dt / this.breathPeriod
@@ -228,14 +244,13 @@ export class LivelyIdle {
       return rest + (v * mirrored - rest) * w * this.moves * (k.startsWith('angle') || k.startsWith('body') ? st.moves : 1)
     }
 
-    // blinks: fast close (75 ms), slower open (120 ms), one in six followed by a second one
+    // blinks: fast close (75 ms), shut for blinkHold, slower open (120 ms), one in six followed by a second one
     let open = 1
     if (this.blinkT < 0 && t > this.nextBlink) { this.blinkT = 0; this.blinkAt = t }
     if (this.blinkT >= 0) {
       this.blinkT += dt
-      const b = this.blinkT / 0.075
-      open = clamp(b < 1 ? 1 - b : b < 2.6 ? (b - 1) / 1.6 : 1, 0, 1)
-      if (b >= 2.6) {
+      open = blinkOpen(this.blinkT, this.blinkHold)
+      if (blinkOver(this.blinkT, this.blinkHold)) {
         this.blinkT = -1
         if (!this.double && Math.random() < 0.18) { this.double = true; this.nextBlink = t + 0.08 }
         else { this.double = false; this.nextBlink = t + (1.8 + Math.random() * 3.8) / Math.max(0.2, this.blinkRate) }
