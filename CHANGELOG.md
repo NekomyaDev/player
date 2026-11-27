@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.1
+
+A fix. A page written for 0.6.0 needs no change.
+
+### Fixed
+
+- **A character loaded while its canvas had no size lost its irises once shown.** In a container with `display: none`,
+  a collapsed panel, or a page that lays its stage out after drawing (one opened in a background tab), the first frame
+  was drawn at 0 × 0: the view came out as NaN and the masks the eyes are drawn through were made at no size and kept
+  so. Shown, an iris off the middle of its eye (any glance aside) was not drawn, only the whites, until the character was
+  loaded again, and every frame logged `GL_INVALID_FRAMEBUFFER_OPERATION … Attachment has zero size`. A frame at no size
+  now draws nothing, and the first frame with a size draws as usual. From 0.3.0 a frame at no size with the eyes
+  glancing aside did it; from 0.6.0, whose first frame warms the masks up, any first frame at no size did.
+
 ## 0.6.0
 
 Long hair that swings and rests on the shoulders, feel settings an editor can change while the character plays, an

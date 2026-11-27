@@ -20,7 +20,7 @@ export type { ParameterProfile, ParameterSample, ParameterRule } from './profile
 export type { ActionId, Driver, Fit, Frame, Host, LivLivErrorCode, LoadOptions, LoadProgress, PlaybackPose, PlayerOptions, View } from './base'
 
 /** this package's version */
-export const VERSION = '0.6.0'
+export const VERSION = '0.6.1'
 
 /** where a model comes from: the URL of its model.json, of the folder holding it, or of a .livliv package (relative URLs
  *  resolve against the page); a .livliv package itself (a File or Blob: a ZIP of the folder); or its files: a FileList /

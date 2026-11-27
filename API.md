@@ -523,7 +523,7 @@ traces (`synthTrace` …), `readModel` with `LIMITS` and `keyformsFit`, the full
 drawing (`brand`), and their types.
 
 **It is outside the compatibility promise of the other entries**: it is the runtime as it is, and a minor version may
-change it. Pin the exact version (`"@livliv-dev/player": "0.6.0"`, not `^0.6.0`) and read the changelog before moving on.
+change it. Pin the exact version (`"@livliv-dev/player": "0.6.1"`, not `^0.6.1`) and read the changelog before moving on.
 It shares its code with the other entries, so a page importing both carries one copy; MediaPipe still loads only when
 face tracking starts.
 

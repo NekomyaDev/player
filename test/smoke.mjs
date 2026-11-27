@@ -297,6 +297,15 @@ try {
     console.log(`${ok ? 'ok  ' : 'FAIL'} long hair rests on the body (${id}): ${r.rests.join('/')} px move with it; hair_rest 0 in the file and setTuning({ hairRest: 0 }) differ by ${r.same.join('/')} px; a still frame by ${r.still.join('/')} px`)
   }
 
+  // a character loaded while its canvas has no size, then shown (see runHiddenLoad)
+  {
+    const id = ids.find((i) => i === 'k01') ?? ids[0]
+    const r = await page.evaluate((a) => window.runHiddenLoad(a), id)
+    const ok = r.hidden.join() === '0,0' && r.differs.every((n) => n === 0) && !r.errors.length
+    if (!ok) failed++
+    console.log(`${ok ? 'ok  ' : 'FAIL'} loaded while its canvas has no size (${id}, ${r.hidden.join(' x ')} then shown): ${r.differs.join('/')} px differ from one loaded where it shows, eyes ahead and aside; WebGL errors ${r.errors.length ? r.errors.join(', ') : 'none'}`)
+  }
+
   // the blink hand-over's switch on Player (see runBlinkSwitch)
   {
     const id = ids.find((i) => i === 'k01') ?? ids[0]

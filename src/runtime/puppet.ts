@@ -1998,10 +1998,10 @@ export class Puppet {
     }
     x0 = Math.max(0, Math.floor(x0) - 2); y0 = Math.max(0, Math.floor(y0) - 2)
     x1 = Math.min(w, Math.ceil(x1) + 2); y1 = Math.min(h, Math.ceil(y1) + 2)
-    if (x1 <= x0 || y1 <= y0) { for (const E of eyes) E.maskCh = -1; return }
+    if (!(x1 > x0 && y1 > y0)) { for (const E of eyes) E.maskCh = -1; return }  // (a box of NaN is nothing to draw too)
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, null)  // not read while it is drawn into
     gl.activeTexture(gl.TEXTURE0)
-    if (!this.maskFb || x1 - x0 > this.maskSize[0] || y1 - y0 > this.maskSize[1]) {
+    if (!this.maskFb || !(x1 - x0 <= this.maskSize[0] && y1 - y0 <= this.maskSize[1])) {
       const W = Math.max(this.maskSize[0], Math.ceil((x1 - x0) / 64) * 64), H = Math.max(this.maskSize[1], Math.ceil((y1 - y0) / 64) * 64)
       this.maskTex ||= gl.createTexture()!
       gl.bindTexture(gl.TEXTURE_2D, this.maskTex)
@@ -2039,6 +2039,10 @@ export class Puppet {
     const [w, h] = this.size ?? [Math.round(cv.clientWidth * dpr), Math.round(cv.clientHeight * dpr)]
     if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h }
     gl.viewport(0, 0, w, h)
+    // a canvas with no size (in a hidden container, or not laid out yet) has nothing to draw into. Drawn on, the view was
+    // NaN, and the irises' masks were made at no size and kept so: once shown, an iris off the middle of its eye was gone
+    // until the next load. The first frame with a size warms up and draws as usual
+    if (!(w >= 1 && h >= 1)) return
     const clear = () => {
       gl.clearColor(...this.background)
       gl.clearStencil(0)

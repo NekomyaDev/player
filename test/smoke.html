@@ -730,6 +730,36 @@
     return { same: offFile.map((d, i) => differ(d, offSet[i])), swings: on.map((d, i) => differ(d, offSet[i])) }
   }
 
+  /** a character loaded while its canvas has no size (autoplay off: load() draws once, here in a display:none box), then
+   *  shown: the same frames as one loaded where it shows, its eyes ahead and glancing aside (an iris off the middle of its
+   *  eye is drawn through the eyes' mask), and no WebGL error */
+  window.runHiddenLoad = async (id) => {
+    const make = (hidden) => {
+      const box = document.createElement('div'), c = document.createElement('canvas')
+      if (hidden) box.style.display = 'none'
+      c.style.cssText = 'width: 320px; height: 400px; display: block'
+      box.append(c); document.body.append(box)
+      return { box, c }
+    }
+    const shot = (c) => { g.canvas.width = c.width; g.canvas.height = c.height; g.drawImage(c, 0, 0); return g.getImageData(0, 0, c.width, c.height).data }
+    const m = bare(await json(id)), a = make(true), b = make(false)
+    const opts = { autoplay: false, followPointer: false, idle: false }
+    const pa = new Player(a.c, opts), pb = new Player(b.c, opts)
+    await pa.load(await filesOf(id, m)); await pb.load(await filesOf(id, m))
+    const hidden = [a.c.width, a.c.height]
+    a.box.style.display = ''
+    const base = pb.getPose(), differs = []
+    for (const eyeBallX of [0, 0.8, -0.8]) {
+      const pose = { ...base, params: { ...base.params, eyeBallX, eyeBallY: 0.3 } }
+      pa.renderPose(pose, 1 / 60); pb.renderPose(pose, 1 / 60)
+      differs.push(differ(shot(a.c), shot(b.c)))
+    }
+    const errors = []
+    for (let k = 0; k < 8; k++) { const e = pa.puppet.gl.getError(); if (!e) break; errors.push(e) }
+    pa.dispose(); pb.dispose(); a.box.remove(); b.box.remove()
+    return { hidden, differs, errors }
+  }
+
   /** player.blinkHandover: on by default; false is the renderer's switch off and no hold in the idle motion's blinks. The
    *  eyes nearly shut (open 0.07) draw differently with it off, open eyes the same; back on is the default's frame to the
    *  pixel, and a load keeps the switch where it was */
